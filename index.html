@@ -313,14 +313,14 @@ document.addEventListener('click', function(ev) {
   if (btn) {
     var val = btn.getAttribute('data-extval');
     var group = btn.getAttribute('data-extgrp');
-    if (val && group) pickExt(val, group);
+    if (val && group) pickExt(val, group, btn.id);
     return;
   }
   if (ev.target.getAttribute('data-extclear')) { clearExt(); }
 });
 
-function pickExt(val, group) {
-  // Update dropdown
+function pickExt(val, group, btnId) {
+  // Update dropdown — find option matching val
   var selEl = document.getElementById('f-extent');
   if (selEl) {
     for (var i = 0; i < selEl.options.length; i++) {
@@ -330,25 +330,27 @@ function pickExt(val, group) {
   // Update label
   var lbl = document.getElementById('extSelLbl');
   if (lbl) lbl.textContent = val;
-  // Clear ALL buttons (single-select across both groups)
+  // Clear ALL buttons across both groups
   ['ce-I','ce-II','ce-III','ce-IV','ce-V','pe-A','pe-B','pe-C','pe-D','pe-E'].forEach(function(id) {
-    var btn = document.getElementById(id);
-    if (!btn) return;
-    btn.classList.remove('selected');
-    btn.style.boxShadow = '';
+    var b = document.getElementById(id);
+    if (!b) return;
+    b.classList.remove('selected');
+    b.style.boxShadow = '';
   });
-  // Highlight only the clicked button (the one in data-extval that matches)
-  ['ce-I','ce-II','ce-III','ce-IV','ce-V','pe-A','pe-B','pe-C','pe-D','pe-E'].forEach(function(id) {
-    var btn = document.getElementById(id);
-    if (!btn) return;
-    var bVal = btn.getAttribute('data-extval');
-    var bGrp = btn.getAttribute('data-extgrp');
-    if (bVal === val && bGrp === group) {
-      btn.classList.add('selected');
-      btn.style.boxShadow = '0 0 0 3px rgba(8,200,208,0.4), 0 0 16px rgba(8,200,208,0.25)';
-    }
-  });
-  // Update group label
+  // Highlight ONLY the exact button that was clicked (by ID)
+  var clicked = btnId ? document.getElementById(btnId) : null;
+  // Fallback: find by val+group if no btnId
+  if (!clicked) {
+    ['ce-I','ce-II','ce-III','ce-IV','ce-V','pe-A','pe-B','pe-C','pe-D','pe-E'].forEach(function(id) {
+      var b = document.getElementById(id);
+      if (b && b.getAttribute('data-extval')===val && b.getAttribute('data-extgrp')===group && !clicked) clicked=b;
+    });
+  }
+  if (clicked) {
+    clicked.classList.add('selected');
+    clicked.style.boxShadow = '0 0 0 3px rgba(8,200,208,0.4), 0 0 16px rgba(8,200,208,0.25)';
+  }
+  // Update group labels
   var grpLbl = document.getElementById(group + '-lbl');
   if (grpLbl) grpLbl.textContent = '\u2713 Selected: ' + val;
   var otherLbl = document.getElementById((group==='ce'?'pe':'ce') + '-lbl');
@@ -1801,11 +1803,11 @@ function buildTabs(p){
     +'<div style="color:#dde5f0;font-weight:700;font-size:13px;margin-bottom:8px">Complex Abdominal Aortic Aneurysm Classification</div>'
     +'<img src="'+PARARENAL_IMG+'" style="width:100%;border-radius:7px;background:#fff;padding:4px;margin-bottom:10px">'
     +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
-    +'<button type="button" id="pe-A" class="extbtn" data-extval="Juxtarenal" data-extgrp="pe"  title="Infrarenal - neck <10mm">A - Short-neck</button>'
-    +'<button type="button" id="pe-B" class="extbtn" data-extval="Juxtarenal" data-extgrp="pe"  title="Juxtarenal - renal endarterectomy">B - Juxtarenal</button>'
-    +'<button type="button" id="pe-C" class="extbtn" data-extval="Pararenal" data-extgrp="pe"   title="One renal involved">C - Pararenal</button>'
-    +'<button type="button" id="pe-D" class="extbtn" data-extval="Paravisceral" data-extgrp="pe" title="Paravisceral - visceral vessels involved">D - Paravisceral</button>'
-    +'<button type="button" id="pe-E" class="extbtn" data-extval="Crawford IV" data-extgrp="pe" title="Type IV TAAA - from diaphragm to below renals">E - Type IV TAAA</button>'
+    +'<button type="button" id="pe-A" class="extbtn" data-extval="Short-neck AAA" data-extgrp="pe"  title="Infrarenal - neck <10mm">A - Short-neck</button>'
+    +'<button type="button" id="pe-B" class="extbtn" data-extval="Juxtarenal AAA" data-extgrp="pe"  title="Juxtarenal - renal endarterectomy">B - Juxtarenal</button>'
+    +'<button type="button" id="pe-C" class="extbtn" data-extval="Pararenal AAA" data-extgrp="pe"   title="One renal involved">C - Pararenal</button>'
+    +'<button type="button" id="pe-D" class="extbtn" data-extval="Paravisceral AAA" data-extgrp="pe" title="Paravisceral - visceral vessels involved">D - Paravisceral</button>'
+    +'<button type="button" id="pe-E" class="extbtn" data-extval="Type IV TAAA" data-extgrp="pe" title="Type IV TAAA - from diaphragm to below renals">E - Type IV TAAA</button>'
     +'</div>'
     +'<div id="pe-lbl" style="color:#08c8d0;font-size:11px;font-weight:600;margin-top:6px;min-height:16px"></div>'
     +'</div>'
