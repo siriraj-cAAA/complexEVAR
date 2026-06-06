@@ -1751,14 +1751,16 @@ var CMD_MFR_LIST_KEY = 'cEVAR_cmdMfr_v1';
 var CMD_MFR_DEFAULTS = ['Cook','Artivion (EDM)','Bolton (Treo Fenestrated)'];
 
 function getCmdMfrList(){
+  // Merge defaults + custom options saved via unified manager
+  var all=CMD_MFR_DEFAULTS.slice();
+  var custom=getCustomOpts()['cmdManufacturer']||[];
+  custom.forEach(function(v){if(all.indexOf(v)===-1)all.push(v);});
+  // Also merge old LS_KEY saved ones
   try{
     var s=localStorage.getItem(CMD_MFR_LIST_KEY);
-    var saved=s?JSON.parse(s):[];
-    // Merge defaults + custom
-    var all=CMD_MFR_DEFAULTS.slice();
-    saved.forEach(function(v){if(all.indexOf(v)===-1)all.push(v);});
-    return all;
-  }catch(e){return CMD_MFR_DEFAULTS.slice();}
+    if(s){JSON.parse(s).forEach(function(v){if(all.indexOf(v)===-1)all.push(v);});}
+  }catch(e){}
+  return all;
 }
 function saveCmdMfrCustom(name){
   try{
@@ -1775,25 +1777,24 @@ function cmdManufacturerSection(pv){
   var stratOpts=['','CMD (Custom-Made Device)','OTS (Off-the-Shelf)','PMEG (Physician-Modified)','Hybrid'];
   var mfrList  = getCmdMfrList();
   var isCMD    = strategy.indexOf('CMD')>-1||strategy.indexOf('PMEG')>-1;
+  var selStyle = 'width:100%;background:#0d1f3c;border:1px solid #1a3652;border-radius:6px;padding:6px 10px;color:#dde5f0;font-size:13px';
 
   return '<div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap">'
     // Planned strategy dropdown
     +'<div style="flex:1;min-width:220px">'
     +'<label style="font-size:11px;color:#7a90b0;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Planned Device Strategy</label>'
-    +'<select id="f-plannedStrategy" onchange="toggleCmdMfr()" style="width:100%;background:#0d1f3c;border:1px solid #1a3652;border-radius:6px;padding:6px 10px;color:#dde5f0;font-size:13px">'
-    +stratOpts.map(function(o){return'<option value="'+o+'"'+(strategy===o?' selected':'')+'>'+o||'-- select --'+'</option>';}).join('')
+    +'<select id="f-plannedStrategy" onchange="toggleCmdMfr()" style="'+selStyle+'">'
+    +stratOpts.map(function(o){return'<option value="'+o+'"'+(strategy===o?' selected':'')+'>'+o+'</option>';}).join('')
     +'</select>'
     +'</div>'
     // CMD/PMEG Manufacturer — shown when CMD or PMEG selected
     +'<div id="cmdMfrWrap" style="flex:1;min-width:220px;display:'+(isCMD?'block':'none')+'">'
     +'<label style="font-size:11px;color:#7a90b0;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">CMD / PMEG Manufacturer</label>'
-    +'<div style="display:flex;gap:6px">'
-    +'<select id="f-cmdManufacturer" style="flex:1;background:#0d1f3c;border:1px solid #1a3652;border-radius:6px;padding:6px 10px;color:#dde5f0;font-size:13px">'
+    +'<select id="f-cmdManufacturer" style="'+selStyle+'">'
     +'<option value="">-- select --</option>'
     +mfrList.map(function(m){return'<option value="'+m+'"'+(mfr===m?' selected':'')+'>'+m+'</option>';}).join('')
-    +'<option value="__add__">\u002b Add manufacturer\u2026</option>'
+    +'<option value="__manage__">\u2699\ufe0f Manage options\u2026</option>'
     +'</select>'
-    +'</div>'
     +'</div>'
     +'</div>';
 }
@@ -1804,25 +1805,9 @@ function toggleCmdMfr(){
   if(!sel||!wrap)return;
   var v=sel.value;
   wrap.style.display=(v.indexOf('CMD')>-1||v.indexOf('PMEG')>-1)?'block':'none';
-  // Attach add-option handler to manufacturer select
+  // Attach unified modal manager to manufacturer select
   var mfrSel=document.getElementById('f-cmdManufacturer');
-  if(mfrSel&&!mfrSel.dataset.addInit){
-    mfrSel.dataset.addInit='1';
-    mfrSel.addEventListener('change',function(){
-      if(mfrSel.value!=='__add__')return;
-      var name=prompt('Enter manufacturer name:');
-      if(name&&name.trim()){
-        name=name.trim();
-        saveCmdMfrCustom(name);
-        var opt=document.createElement('option');
-        opt.value=name;opt.textContent=name;opt.selected=true;
-        mfrSel.insertBefore(opt,mfrSel.lastElementChild);
-        mfrSel.value=name;
-      } else {
-        mfrSel.value='';
-      }
-    });
-  }
+  if(mfrSel)initCustomSelect(mfrSel,'cmdManufacturer');
 }
 
 
