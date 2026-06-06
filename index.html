@@ -1730,7 +1730,7 @@ function initAllCustomSelects(){
     'f-graftConfig':'graftConfig','f-graftConfig2':'graftConfig','f-graftConfig3':'graftConfig',
     'ibd_l_dev':'ibdDevice','ibd_r_dev':'ibdDevice',
     'ibd_l_iiaStent':'bridgingStent','ibd_r_iiaStent':'bridgingStent',
-    'f-procType':'procType','f-ana':'anaType',
+    'f-procType':'procType','f-ana':'anaType','f-diagnosis':'aorticDiagnosis','f-presentation':'presentation',
     /* staff selects managed separately via pickStaff/openOptManager */
   };
   Object.keys(map).forEach(function(id){
@@ -1772,28 +1772,38 @@ function saveCmdMfrCustom(name){
 }
 
 function cmdManufacturerSection(pv){
-  var strategy = pv.plannedStrategy || '';
-  var mfr      = pv.cmdManufacturer || '';
-  var stratOpts=['','CMD (Custom-Made Device)','OTS (Off-the-Shelf)','PMEG (Physician-Modified)','Hybrid'];
-  var mfrList  = getCmdMfrList();
-  var isCMD    = strategy.indexOf('CMD')>-1||strategy.indexOf('PMEG')>-1;
-  var selStyle = 'width:100%;background:#0d1f3c;border:1px solid #1a3652;border-radius:6px;padding:6px 10px;color:#dde5f0;font-size:13px';
+  var strategy  = pv.plannedStrategy  || '';
+  var mfrCMD    = pv.cmdManufacturer  || '';
+  var mfrOTS    = pv.otsManufacturer  || '';
+  var stratOpts = ['','CMD (Custom-Made Device)','OTS (Off-the-Shelf)','PMEG (Physician-Modified)','Hybrid'];
+  var cmdList   = getCmdMfrList();
+  var otsList   = ['Zenith t-Branch (Cook)','E-nside (Artivion)','TAMBE (Gore)'];
+  var isCMD     = strategy.indexOf('CMD')>-1||strategy.indexOf('PMEG')>-1;
+  var isOTS     = strategy.indexOf('OTS')>-1;
+  var sel_style = 'width:100%;background:#0d1f3c;border:1px solid #1a3652;border-radius:6px;padding:6px 10px;color:#dde5f0;font-size:13px';
 
   return '<div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap">'
-    // Planned strategy dropdown
+    // Planned strategy
     +'<div style="flex:1;min-width:220px">'
     +'<label style="font-size:11px;color:#7a90b0;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Planned Device Strategy</label>'
-    +'<select id="f-plannedStrategy" onchange="toggleCmdMfr()" style="'+selStyle+'">'
+    +'<select id="f-plannedStrategy" onchange="toggleCmdMfr()" style="'+sel_style+'">'
     +stratOpts.map(function(o){return'<option value="'+o+'"'+(strategy===o?' selected':'')+'>'+o+'</option>';}).join('')
     +'</select>'
     +'</div>'
-    // CMD/PMEG Manufacturer — shown when CMD or PMEG selected
+    // CMD/PMEG manufacturer
     +'<div id="cmdMfrWrap" style="flex:1;min-width:220px;display:'+(isCMD?'block':'none')+'">'
     +'<label style="font-size:11px;color:#7a90b0;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">CMD / PMEG Manufacturer</label>'
-    +'<select id="f-cmdManufacturer" style="'+selStyle+'">'
+    +'<select id="f-cmdManufacturer" style="'+sel_style+'">'
     +'<option value="">-- select --</option>'
-    +mfrList.map(function(m){return'<option value="'+m+'"'+(mfr===m?' selected':'')+'>'+m+'</option>';}).join('')
-    +'<option value="__manage__">\u2699\ufe0f Manage options\u2026</option>'
+    +cmdList.map(function(m){return'<option value="'+m+'"'+(mfrCMD===m?' selected':'')+'>'+m+'</option>';}).join('')
+    +'</select>'
+    +'</div>'
+    // OTS device
+    +'<div id="otsMfrWrap" style="flex:1;min-width:220px;display:'+(isOTS?'block':'none')+'">'
+    +'<label style="font-size:11px;color:#7a90b0;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">OTS Device</label>'
+    +'<select id="f-otsManufacturer" style="'+sel_style+'">'
+    +'<option value="">-- select --</option>'
+    +otsList.map(function(m){return'<option value="'+m+'"'+(mfrOTS===m?' selected':'')+'>'+m+'</option>';}).join('')
     +'</select>'
     +'</div>'
     +'</div>';
@@ -1801,13 +1811,17 @@ function cmdManufacturerSection(pv){
 
 function toggleCmdMfr(){
   var sel=document.getElementById('f-plannedStrategy');
-  var wrap=document.getElementById('cmdMfrWrap');
-  if(!sel||!wrap)return;
+  var cmdWrap=document.getElementById('cmdMfrWrap');
+  var otsWrap=document.getElementById('otsMfrWrap');
+  if(!sel)return;
   var v=sel.value;
-  wrap.style.display=(v.indexOf('CMD')>-1||v.indexOf('PMEG')>-1)?'block':'none';
-  // Attach unified modal manager to manufacturer select
+  if(cmdWrap)cmdWrap.style.display=(v.indexOf('CMD')>-1||v.indexOf('PMEG')>-1)?'block':'none';
+  if(otsWrap)otsWrap.style.display=v.indexOf('OTS')>-1?'block':'none';
+  // Attach modal manager
   var mfrSel=document.getElementById('f-cmdManufacturer');
   if(mfrSel)initCustomSelect(mfrSel,'cmdManufacturer');
+  var otsSel=document.getElementById('f-otsManufacturer');
+  if(otsSel)initCustomSelect(otsSel,'otsManufacturerList');
 }
 
 
@@ -1904,6 +1918,15 @@ function calcBodyMetrics(){
 function bodyMetricInp(id, val, label){
   var s='width:100%;background:#0d1f3c;border:1px solid #1a3652;border-radius:6px;padding:6px 10px;color:#dde5f0;font-size:13px';
   return '<input id="'+id+'" type="number" step="0.1" value="'+(val||'')+'" oninput="calcBodyMetrics()" style="'+s+'">';
+}
+
+
+function initDiagnosisSelects(){
+  var map={'f-diagnosis':'aorticDiagnosis','f-presentation':'presentation'};
+  Object.keys(map).forEach(function(id){
+    var el=document.getElementById(id);
+    if(el)initCustomSelect(el,map[id]);
+  });
 }
 
 function buildTabs(p){
@@ -2317,7 +2340,7 @@ function showFTab(i){
   document.getElementById('formBody').innerHTML=formTabs[i]||'';
   if(i===2){attachOpTimeListeners();toggleDeviceOpts();setTimeout(initAllCustomSelects,80);}
   if(i===0){setTimeout(calcFrailty,50);setTimeout(calcBodyMetrics,60);}
-  if(i===1){setTimeout(toggleCmdMfr,50);}
+  if(i===1){setTimeout(function(){toggleCmdMfr();initDiagnosisSelects();},80);}
   if(i===0){setTimeout(calcFrailty,50);}
   // After rendering, resize zone overlay divs to match image
   if(i===1){
@@ -2356,7 +2379,7 @@ async function saveForm(){
   if(fri.mfi5Items&&typeof fri.mfi5Items==='object')fri.mfi5Items=JSON.stringify(fri.mfi5Items);
   if(fri.frailItems&&typeof fri.frailItems==='object')fri.frailItems=JSON.stringify(fri.frailItems);
   if(adjA.adjunctAortic&&typeof adjA.adjunctAortic==='object')adjA.adjunctAorticJson=JSON.stringify(adjA.adjunctAortic);
-  var pt=Object.assign({id:id,dateRegistry:gv('f-dateRegistry'),dateCTA:gv('f-dateCTA'),datePreop:gv('f-datePreop'),patientStatus:gv('f-patientStatus'),graftPlanSign:gv('f-graftPlanSign'),graftShipDate:gv('f-graftShipDate'),procedureDate:gv('f-procedureDate'),actualProcedureDate:gv('f-actualProcedureDate'),hn:gv('f-hn'),age:gv('f-age'),sex:gv('f-sex'),weight:gv('f-weight'),height:gv('f-height'),bmi:gv('f-bmi'),bsa:gv('f-bsa'),asa:gv('f-asa'),htn:gv('f-htn'),dm:gv('f-dm'),dyslipaemia:gv('f-dyslipaemia'),smoking:gv('f-smoking'),packYears:gv('f-packYears'),cad:gv('f-cad'),copd:gv('f-copd'),ckd:gv('f-ckd'),creatinine:gv('f-creatinine'),egfr:gv('f-egfr'),pvd:gv('f-pvd'),cvd:gv('f-cvd'),frailtyTool:gv('f-frailtyTool'),frailtyScore:gv('f-frailtyScore'),frailtyGrade:gv('f-frailtyGrade'),presentation:gv('f-presentation'),diagnosis:gv('f-diagnosis'),extent:gv('f-extent'),maxDiam:gv('f-maxDiam'),proxNeck:gv('f-proxNeck'),neckAngle:gv('f-neckAngle'),neckCalc:gv('f-neckCalc'),ifu:gv('f-ifu'),sdm:gv('f-sdm'),procType:gv('f-procType'),deviceStrategy:gv('f-deviceStrategy'),brand:gv('f-brand'),model:gv('f-model'),proxDiam:gv('f-proxDiam'),proxSeal:gv('f-proxSeal'),fenestrations:gv('f-fenestrations'),branches:gv('f-branches'),celiac:gv('f-celiac'),sma:gv('f-sma'),lRenal:gv('f-lRenal'),rRenal:gv('f-rRenal'),lSubcl:gv('f-lSubcl'),ana:gv('f-ana'),csfDrain:gv('f-csfDrain'),spinal:gv('f-spinal'),mapTarget:gv('f-mapTarget'),staged:gv('f-staged'),plannedStrategy:gv('f-plannedStrategy'),cmdManufacturer:gv('f-cmdManufacturer'),operator:gv('f-operator'),assistant:gv('f-assistant'),anesthesiologist:gv('f-anesthesiologist'),timeAnesStart:gv('f-timeAnesStart'),timeOpStart:gv('f-timeOpStart'),timeOpEnd:gv('f-timeOpEnd'),timeAnesEnd:gv('f-timeAnesEnd'),airKerma:gv('f-airKerma'),dap:gv('f-dap'),contrastName:gv('f-contrastName'),co2angio:gvChk('f-co2angio'),cbct:gvChk('f-cbct'),sheath:gv('f-sheath'),guidewire:gv('f-guidewire'),catheter:gv('f-catheter'),orTime:gv('f-orTime'),fluoro:gv('f-fluoro'),contrast:gv('f-contrast'),ebl:gv('f-ebl'),ptSuccess:gv('f-ptSuccess'),tvSuccess:gv('f-tvSuccess'),intraopEL:gv('f-intraopEL'),sci:gv('f-sci'),sciGrade:gv('f-sciGrade'),sciPerm:gv('f-sciPerm'),sciOnset:gv('f-sciOnset'),stroke:gv('f-stroke'),aki:gv('f-aki'),akiStage:gv('f-akiStage'),rrt:gv('f-rrt'),bowel:gv('f-bowel'),mi:gv('f-mi'),icu:gv('f-icu'),hospital:gv('f-hospital'),mort30d:gv('f-mort30d'),cause30d:gv('f-cause30d'),mae:gv('f-mae'),celiacP:gv('f-celiacP'),smaP:gv('f-smaP'),lRenalP:gv('f-lRenalP'),rRenalP:gv('f-rRenalP'),tvi:gv('f-tvi'),tviType:gv('f-tviType'),proxZone:gv('f-proxZone'),distZoneL:gv('f-distZoneL'),distZoneR:gv('f-distZoneR'),zoneExtent:gv('f-zoneExtent'),followups:collectFUs()},access,device,tvs,fri,adjA);
+  var pt=Object.assign({id:id,dateRegistry:gv('f-dateRegistry'),dateCTA:gv('f-dateCTA'),datePreop:gv('f-datePreop'),patientStatus:gv('f-patientStatus'),graftPlanSign:gv('f-graftPlanSign'),graftShipDate:gv('f-graftShipDate'),procedureDate:gv('f-procedureDate'),actualProcedureDate:gv('f-actualProcedureDate'),hn:gv('f-hn'),age:gv('f-age'),sex:gv('f-sex'),weight:gv('f-weight'),height:gv('f-height'),bmi:gv('f-bmi'),bsa:gv('f-bsa'),asa:gv('f-asa'),htn:gv('f-htn'),dm:gv('f-dm'),dyslipaemia:gv('f-dyslipaemia'),smoking:gv('f-smoking'),packYears:gv('f-packYears'),cad:gv('f-cad'),copd:gv('f-copd'),ckd:gv('f-ckd'),creatinine:gv('f-creatinine'),egfr:gv('f-egfr'),pvd:gv('f-pvd'),cvd:gv('f-cvd'),frailtyTool:gv('f-frailtyTool'),frailtyScore:gv('f-frailtyScore'),frailtyGrade:gv('f-frailtyGrade'),presentation:gv('f-presentation'),diagnosis:gv('f-diagnosis'),extent:gv('f-extent'),maxDiam:gv('f-maxDiam'),proxNeck:gv('f-proxNeck'),neckAngle:gv('f-neckAngle'),neckCalc:gv('f-neckCalc'),ifu:gv('f-ifu'),sdm:gv('f-sdm'),procType:gv('f-procType'),deviceStrategy:gv('f-deviceStrategy'),brand:gv('f-brand'),model:gv('f-model'),proxDiam:gv('f-proxDiam'),proxSeal:gv('f-proxSeal'),fenestrations:gv('f-fenestrations'),branches:gv('f-branches'),celiac:gv('f-celiac'),sma:gv('f-sma'),lRenal:gv('f-lRenal'),rRenal:gv('f-rRenal'),lSubcl:gv('f-lSubcl'),ana:gv('f-ana'),csfDrain:gv('f-csfDrain'),spinal:gv('f-spinal'),mapTarget:gv('f-mapTarget'),staged:gv('f-staged'),plannedStrategy:gv('f-plannedStrategy'),cmdManufacturer:gv('f-cmdManufacturer'),otsManufacturer:gv('f-otsManufacturer'),operator:gv('f-operator'),assistant:gv('f-assistant'),anesthesiologist:gv('f-anesthesiologist'),timeAnesStart:gv('f-timeAnesStart'),timeOpStart:gv('f-timeOpStart'),timeOpEnd:gv('f-timeOpEnd'),timeAnesEnd:gv('f-timeAnesEnd'),airKerma:gv('f-airKerma'),dap:gv('f-dap'),contrastName:gv('f-contrastName'),co2angio:gvChk('f-co2angio'),cbct:gvChk('f-cbct'),sheath:gv('f-sheath'),guidewire:gv('f-guidewire'),catheter:gv('f-catheter'),orTime:gv('f-orTime'),fluoro:gv('f-fluoro'),contrast:gv('f-contrast'),ebl:gv('f-ebl'),ptSuccess:gv('f-ptSuccess'),tvSuccess:gv('f-tvSuccess'),intraopEL:gv('f-intraopEL'),sci:gv('f-sci'),sciGrade:gv('f-sciGrade'),sciPerm:gv('f-sciPerm'),sciOnset:gv('f-sciOnset'),stroke:gv('f-stroke'),aki:gv('f-aki'),akiStage:gv('f-akiStage'),rrt:gv('f-rrt'),bowel:gv('f-bowel'),mi:gv('f-mi'),icu:gv('f-icu'),hospital:gv('f-hospital'),mort30d:gv('f-mort30d'),cause30d:gv('f-cause30d'),mae:gv('f-mae'),celiacP:gv('f-celiacP'),smaP:gv('f-smaP'),lRenalP:gv('f-lRenalP'),rRenalP:gv('f-rRenalP'),tvi:gv('f-tvi'),tviType:gv('f-tviType'),proxZone:gv('f-proxZone'),distZoneL:gv('f-distZoneL'),distZoneR:gv('f-distZoneR'),zoneExtent:gv('f-zoneExtent'),followups:collectFUs()},access,device,tvs,fri,adjA);
   var btn=document.getElementById('saveBtn');
   btn.disabled=true;btn.textContent='Saving...';
   try{
