@@ -1355,7 +1355,15 @@ function lsSave(){
 function lsLoad(){
   try{
     var d=localStorage.getItem(LS_KEY);
-    if(d){patients=JSON.parse(d);return true;}
+    if(d){
+      patients=JSON.parse(d).map(function(p){
+        if(typeof p.mfi5Items==='string'){try{p.mfi5Items=JSON.parse(p.mfi5Items);}catch(e){p.mfi5Items={};}}
+        if(typeof p.frailItems==='string'){try{p.frailItems=JSON.parse(p.frailItems);}catch(e){p.frailItems={};}}
+        if(typeof p.adjunctAortic==='string'){try{p.adjunctAortic=JSON.parse(p.adjunctAortic);}catch(e){p.adjunctAortic={};}}
+        return p;
+      });
+      return true;
+    }
   }catch(e){}
   return false;
 }
@@ -1907,6 +1915,12 @@ function calcBodyMetrics(){
   if(bsaEl)bsaEl.value=bsa;
 }
 
+
+function bodyMetricInp(id, val, label){
+  var s='width:100%;background:#0d1f3c;border:1px solid #1a3652;border-radius:6px;padding:6px 10px;color:#dde5f0;font-size:13px';
+  return '<input id="'+id+'" type="number" step="0.1" value="'+(val||'')+'" oninput="calcBodyMetrics()" style="'+s+'">';
+}
+
 function buildTabs(p){
   var pv=p||{};
   // Zone diagram HTML
@@ -1935,13 +1949,9 @@ function buildTabs(p){
     sh('📋 Registry Status')
     +gr(4,[fld('Date of Registry *',inp('f-dateRegistry','date',pv.dateRegistry||'')),fld('Date of CTA',inp('f-dateCTA','date',pv.dateCTA||'')),fld('Date of Complete Preop Evaluation',inp('f-datePreop','date',pv.datePreop||'')),fld('Patient Status *',sel('f-patientStatus',['','OR Scheduled','Awaiting OR Scheduled','Awaiting Preoperative Evaluation'],pv.patientStatus||''))])     +gr(2,[fld('Graft Plan Sign Date',inp('f-graftPlanSign','date',pv.graftPlanSign||'')),fld('Expected Graft Shipping Date',inp('f-graftShipDate','date',pv.graftShipDate||''))])
     +sh('Patient Identifiers (VASCUNET Core Dataset)')
-    +gr(4,[fld('Case ID *',inp('f-id','text',pv.id||newId())),fld('Procedure Date *',inp('f-procedureDate','date',pv.procedureDate)),fld('Hospital No. (HN)',inp('f-hn','text',pv.hn)),fld('Age (years)',inp('f-age','number',pv.age)),fld('Sex',sel('f-sex',OPTS.sex,pv.sex)),fld('Weight (kg)',"<input id='f-weight' type='number' step='0.1' value='"+(pv.weight||'')+"' "
-    +"oninput=\"calcBodyMetrics()\" style='width:100%;background:#0d1f3c;border:1px solid #1a3652;border-radius:6px;padding:6px 10px;color:#dde5f0;font-size:13px'>"),
-fld('Height (cm)',"<input id='f-height' type='number' step='0.1' value='"+(pv.height||'')+"' "
-    +"oninput=\"calcBodyMetrics()\" style='width:100%;background:#0d1f3c;border:1px solid #1a3652;border-radius:6px;padding:6px 10px;color:#dde5f0;font-size:13px'>"
-    +"<input type='hidden' id='f-bmi' value='"+(pv.bmi||'')+ "'>"
-    +"<input type='hidden' id='f-bsa' value='"+(pv.bsa||'')+ "'>")
-,fld('ASA Class',sel('f-asa',OPTS.asa,pv.asa))])
+    +gr(4,[fld('Case ID *',inp('f-id','text',pv.id||newId())),fld('Procedure Date *',inp('f-procedureDate','date',pv.procedureDate)),fld('Hospital No. (HN)',inp('f-hn','text',pv.hn)),fld('Age (years)',inp('f-age','number',pv.age)),fld('Sex',sel('f-sex',OPTS.sex,pv.sex)),fld('Weight (kg)',bodyMetricInp('f-weight',pv.weight||'')),
+fld('Height (cm)',bodyMetricInp('f-height',pv.height||'')+'<input type="hidden" id="f-bmi" value="'+(pv.bmi||'')+'">'+'<input type="hidden" id="f-bsa" value="'+(pv.bsa||'')+'">'),
+fld('ASA Class',sel('f-asa',OPTS.asa,pv.asa))])
     +'<div id="bmiPanel" style="display:flex;gap:24px;align-items:center;padding:10px 14px;'
     +'background:#0d1f3c;border:1px solid #1a3652;border-radius:8px;margin-bottom:8px;flex-wrap:wrap">'
     +'<span style="font-size:13px;color:#7a90b0">BMI: '
@@ -2129,7 +2139,16 @@ async function loadData(){
   lsLoad();renderAll();
   try{
     var d=await api('load');
-    if(d&&d.patients){patients=d.patients;lsSave();}
+    if(d&&d.patients){
+      patients=d.patients.map(function(p){
+        // Parse JSON blob fields back to objects
+        if(typeof p.mfi5Items==='string'){try{p.mfi5Items=JSON.parse(p.mfi5Items);}catch(e){p.mfi5Items={};}}
+        if(typeof p.frailItems==='string'){try{p.frailItems=JSON.parse(p.frailItems);}catch(e){p.frailItems={};}}
+        if(typeof p.adjunctAortic==='string'){try{p.adjunctAortic=JSON.parse(p.adjunctAortic);}catch(e){p.adjunctAortic={};}}
+        return p;
+      });
+      lsSave();
+    }
   }catch(e){console.warn('loadData failed:',e.message);}
   renderAll();
 }
@@ -2347,6 +2366,10 @@ async function saveForm(){
   var fri=collectFrailtyItems();
   var adjA=collectAdjunctAortic();
   calcFrailty();
+  // Flatten JSON blob fields for Google Sheets storage
+  if(fri.mfi5Items&&typeof fri.mfi5Items==='object')fri.mfi5Items=JSON.stringify(fri.mfi5Items);
+  if(fri.frailItems&&typeof fri.frailItems==='object')fri.frailItems=JSON.stringify(fri.frailItems);
+  if(adjA.adjunctAortic&&typeof adjA.adjunctAortic==='object')adjA.adjunctAorticJson=JSON.stringify(adjA.adjunctAortic);
   var pt=Object.assign({id:id,dateRegistry:gv('f-dateRegistry'),dateCTA:gv('f-dateCTA'),datePreop:gv('f-datePreop'),patientStatus:gv('f-patientStatus'),graftPlanSign:gv('f-graftPlanSign'),graftShipDate:gv('f-graftShipDate'),procedureDate:gv('f-procedureDate'),hn:gv('f-hn'),age:gv('f-age'),sex:gv('f-sex'),weight:gv('f-weight'),height:gv('f-height'),bmi:gv('f-bmi'),bsa:gv('f-bsa'),asa:gv('f-asa'),htn:gv('f-htn'),dm:gv('f-dm'),dyslipaemia:gv('f-dyslipaemia'),smoking:gv('f-smoking'),packYears:gv('f-packYears'),cad:gv('f-cad'),copd:gv('f-copd'),ckd:gv('f-ckd'),creatinine:gv('f-creatinine'),egfr:gv('f-egfr'),pvd:gv('f-pvd'),cvd:gv('f-cvd'),frailtyTool:gv('f-frailtyTool'),frailtyScore:gv('f-frailtyScore'),frailtyGrade:gv('f-frailtyGrade'),presentation:gv('f-presentation'),diagnosis:gv('f-diagnosis'),extent:gv('f-extent'),maxDiam:gv('f-maxDiam'),proxNeck:gv('f-proxNeck'),neckAngle:gv('f-neckAngle'),neckCalc:gv('f-neckCalc'),ifu:gv('f-ifu'),sdm:gv('f-sdm'),procType:gv('f-procType'),deviceStrategy:gv('f-deviceStrategy'),brand:gv('f-brand'),model:gv('f-model'),proxDiam:gv('f-proxDiam'),proxSeal:gv('f-proxSeal'),fenestrations:gv('f-fenestrations'),branches:gv('f-branches'),celiac:gv('f-celiac'),sma:gv('f-sma'),lRenal:gv('f-lRenal'),rRenal:gv('f-rRenal'),lSubcl:gv('f-lSubcl'),ana:gv('f-ana'),csfDrain:gv('f-csfDrain'),spinal:gv('f-spinal'),mapTarget:gv('f-mapTarget'),staged:gv('f-staged'),plannedStrategy:gv('f-plannedStrategy'),cmdManufacturer:gv('f-cmdManufacturer'),operator:gv('f-operator'),assistant:gv('f-assistant'),anesthesiologist:gv('f-anesthesiologist'),timeAnesStart:gv('f-timeAnesStart'),timeOpStart:gv('f-timeOpStart'),timeOpEnd:gv('f-timeOpEnd'),timeAnesEnd:gv('f-timeAnesEnd'),airKerma:gv('f-airKerma'),dap:gv('f-dap'),contrastName:gv('f-contrastName'),co2angio:gvChk('f-co2angio'),cbct:gvChk('f-cbct'),sheath:gv('f-sheath'),guidewire:gv('f-guidewire'),catheter:gv('f-catheter'),orTime:gv('f-orTime'),fluoro:gv('f-fluoro'),contrast:gv('f-contrast'),ebl:gv('f-ebl'),ptSuccess:gv('f-ptSuccess'),tvSuccess:gv('f-tvSuccess'),intraopEL:gv('f-intraopEL'),sci:gv('f-sci'),sciGrade:gv('f-sciGrade'),sciPerm:gv('f-sciPerm'),sciOnset:gv('f-sciOnset'),stroke:gv('f-stroke'),aki:gv('f-aki'),akiStage:gv('f-akiStage'),rrt:gv('f-rrt'),bowel:gv('f-bowel'),mi:gv('f-mi'),icu:gv('f-icu'),hospital:gv('f-hospital'),mort30d:gv('f-mort30d'),cause30d:gv('f-cause30d'),mae:gv('f-mae'),celiacP:gv('f-celiacP'),smaP:gv('f-smaP'),lRenalP:gv('f-lRenalP'),rRenalP:gv('f-rRenalP'),tvi:gv('f-tvi'),tviType:gv('f-tviType'),proxZone:gv('f-proxZone'),distZoneL:gv('f-distZoneL'),distZoneR:gv('f-distZoneR'),zoneExtent:gv('f-zoneExtent'),followups:collectFUs()},access,device,tvs,fri,adjA);
   var btn=document.getElementById('saveBtn');
   btn.disabled=true;btn.textContent='Saving...';
