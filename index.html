@@ -113,6 +113,20 @@ input:focus,select:focus{border-color:#08c8d0}
 .zpanel-val{color:#dde5f0;font-size:13px;font-weight:700;min-height:18px}
 .zgrid{display:grid;gap:8px;margin-top:12px}
 .ztip{color:#7a90b0;font-size:10px;margin-bottom:7px;line-height:1.6;background:#112240;padding:7px 10px;border-radius:5px}
+/* Option Manager Modal */
+#optMgrOverlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9000;display:none;align-items:center;justify-content:center}
+#optMgrOverlay.open{display:flex}
+#optMgrBox{background:#0d1f3c;border:1px solid #1a3652;border-radius:12px;padding:20px 24px;width:380px;max-width:95vw;max-height:80vh;display:flex;flex-direction:column;gap:12px;box-shadow:0 8px 32px rgba(0,0,0,.6)}
+#optMgrTitle{font-size:14px;font-weight:700;color:#dde5f0}
+#optMgrList{overflow-y:auto;display:flex;flex-direction:column;gap:6px;max-height:300px}
+.oml-row{display:flex;align-items:center;gap:8px}
+.oml-name{flex:1;font-size:13px;color:#dde5f0;padding:6px 10px;background:#081428;border-radius:6px;border:1px solid #1a3652}
+.oml-edit{background:none;border:1px solid #1a6fd4;color:#1a6fd4;border-radius:5px;padding:4px 10px;font-size:12px;cursor:pointer;white-space:nowrap}
+.oml-del{background:none;border:1px solid #e03030;color:#e03030;border-radius:5px;padding:4px 10px;font-size:12px;cursor:pointer;white-space:nowrap}
+#optMgrAddRow{display:flex;gap:8px;margin-top:4px}
+#optMgrAddInp{flex:1;background:#081428;border:1px solid #1a3652;border-radius:6px;padding:6px 10px;color:#dde5f0;font-size:13px}
+#optMgrAddBtn{background:#1a6fd4;border:none;color:#fff;border-radius:6px;padding:6px 16px;font-size:13px;cursor:pointer;font-weight:600}
+#optMgrClose{align-self:flex-end;background:none;border:1px solid #1a3652;color:#7a90b0;border-radius:6px;padding:5px 16px;font-size:12px;cursor:pointer}
 .rbtn{display:inline-flex;align-items:center;padding:5px 14px;border-radius:20px;border:1px solid #1a3652;background:#0d1f3c;color:#7a90b0;font-size:13px;cursor:pointer;user-select:none;transition:all .15s;white-space:nowrap;line-height:1.4}
 .rbtn:hover{border-color:#1a6fd4;color:#dde5f0}
 .rbtn.active{background:#0e2a52;border-color:#1a6fd4;color:#fff;box-shadow:0 0 0 2px rgba(26,111,212,.3)}
@@ -320,7 +334,7 @@ document.addEventListener('click', function(ev) {
 });
 
 function pickExt(val, group, btnId) {
-  // Update dropdown — find option matching val
+  // Update dropdown
   var selEl = document.getElementById('f-extent');
   if (selEl) {
     for (var i = 0; i < selEl.options.length; i++) {
@@ -330,27 +344,23 @@ function pickExt(val, group, btnId) {
   // Update label
   var lbl = document.getElementById('extSelLbl');
   if (lbl) lbl.textContent = val;
-  // Clear ALL buttons across both groups
+  // Clear ALL buttons
   ['ce-I','ce-II','ce-III','ce-IV','ce-V','pe-A','pe-B','pe-C','pe-D','pe-E'].forEach(function(id) {
     var b = document.getElementById(id);
     if (!b) return;
     b.classList.remove('selected');
     b.style.boxShadow = '';
   });
-  // Highlight ONLY the exact button that was clicked (by ID)
+  // Highlight ONLY the exact button clicked (by ID)
   var clicked = btnId ? document.getElementById(btnId) : null;
-  // Fallback: find by val+group if no btnId
   if (!clicked) {
     ['ce-I','ce-II','ce-III','ce-IV','ce-V','pe-A','pe-B','pe-C','pe-D','pe-E'].forEach(function(id) {
       var b = document.getElementById(id);
       if (b && b.getAttribute('data-extval')===val && b.getAttribute('data-extgrp')===group && !clicked) clicked=b;
     });
   }
-  if (clicked) {
-    clicked.classList.add('selected');
-    clicked.style.boxShadow = '0 0 0 3px rgba(8,200,208,0.4), 0 0 16px rgba(8,200,208,0.25)';
-  }
-  // Update group labels
+  if (clicked) { clicked.classList.add('selected'); clicked.style.boxShadow='0 0 0 3px rgba(8,200,208,0.4),0 0 16px rgba(8,200,208,0.25)'; }
+  // Update group label
   var grpLbl = document.getElementById(group + '-lbl');
   if (grpLbl) grpLbl.textContent = '\u2713 Selected: ' + val;
   var otherLbl = document.getElementById((group==='ce'?'pe':'ce') + '-lbl');
@@ -514,7 +524,7 @@ function drawZoneColor(ctx,img,color){
   for(var i=0;i<d.length;i+=4){
     var r=d[i],g=d[i+1],b=d[i+2];
     // Cyan/blue highlight: B dominant over R, and G > R
-    var isCyan=(b>120 && b>r*1.15 && g>r && !(r>210&&g>210&&b>210) && !(r<30&&g<30&&b<30));
+    var isCyan=(b>80&&(b-r)>25&&(b-g)>10&&!(r>235&&g>235&&b>235)&&!(r<30&&g<30&&b<30));
     if(isCyan){
       var br=Math.min(1.0,(b+g)/(220*2));
       d[i]  =Math.min(255,Math.round(color[0]*(0.5+br*0.7)));
@@ -554,7 +564,7 @@ function drawZoneHalf(ctx,img,color,side){
   var d=id.data;
   for(var i=0;i<d.length;i+=4){
     var r=d[i],g=d[i+1],b=d[i+2];
-    var isCyan=(b>120&&b>r*1.15&&g>r&&!(r>210&&g>210&&b>210)&&!(r<30&&g<30&&b<30));
+    var isCyan=(b>80&&(b-r)>25&&(b-g)>10&&!(r>235&&g>235&&b>235)&&!(r<30&&g<30&&b<30));
     if(isCyan){
       var br=Math.min(1.0,(b+g)/(220*2));
       d[i]  =Math.min(255,Math.round(color[0]*(0.5+br*0.7)));
@@ -1386,46 +1396,38 @@ function staffDropdown(id, role, currentVal) {
     + opts.map(function(n) {
         return '<option value="' + esc(n) + '"' + (n === currentVal ? ' selected' : '') + '>' + esc(n) + '</option>';
       }).join('')
-    + '<option value="__add__">+ Add new name\u2026</option>'
+    + '<option value="__manage__">\u2699\ufe0f Manage options\u2026</option>'
     + '</select>'
     + '<input type="hidden" id="' + hidId + '" value="' + esc(currentVal || '') + '">'
     + '</div>';
 }
 
 function pickStaff(id, role) {
-  var selId = 'staff-sel-' + id;
-  var hidId = 'f-' + id;
-  var sel   = document.getElementById(selId);
-  var hid   = document.getElementById(hidId);
-  if (!sel) return;
-  if (sel.value === '__add__') {
-    var name = prompt('Enter name to add to ' + role + ' list:');
-    if (name && name.trim()) {
-      name = name.trim();
-      var lists = getStaffLists();
-      if (!lists[role]) lists[role] = [];
-      if (lists[role].indexOf(name) === -1) lists[role].push(name);
-      saveStaffLists();
-      staffLists = lists; // refresh cache
-      // Rebuild select
-      var newOpt = document.createElement('option');
-      newOpt.value = name; newOpt.textContent = name; newOpt.selected = true;
-      sel.insertBefore(newOpt, sel.lastElementChild); // before "+ Add new"
-      sel.value = name;
-      if (hid) hid.value = name;
-    } else {
-      sel.value = hid ? hid.value : '';
-    }
+  var selId='staff-sel-'+id, hidId='f-'+id;
+  var sel=document.getElementById(selId), hid=document.getElementById(hidId);
+  if(!sel)return;
+  if(sel.value==='__manage__'){
+    var lists=getStaffLists();
+    var names=(lists[role]||[]);
+    var sent=sel.querySelector('option[value="__manage__"]');
+    names.forEach(function(name){
+      if(!Array.from(sel.options).find(function(o){return o.value===name;})){
+        var opt=document.createElement('option');
+        opt.value=name;opt.textContent=name;opt.dataset.custom='1';
+        sel.insertBefore(opt,sent);
+      }
+    });
+    openOptManager(sel,role);
+    setTimeout(function(){sel.value=hid?hid.value:'';},0);
+  } else if(sel.value&&sel.value!=='__add__'&&sel.value!=='__edit__'){
+    if(hid)hid.value=sel.value;
   } else {
-    if (hid) hid.value = sel.value;
+    sel.value=hid?hid.value:'';
   }
 }
 
-
-// ── ADJUNCT AORTIC PROCEDURES SECTION ────────────────────────────────────────
-var IBD_DEVICES = ['','Zenith Branch (Cook)','E-liac (Artivion)','IBE (Gore)','PMEG'];
-var IIA_BRIDGING = ['','BeGraft','BeGraft Plus','BeFlared','V12','Radiant','VBX','Viabahn','Covera','Fluency','Solaris','Lifestream','iCover'];
-
+var IBD_DEVICES=['','Zenith Branch (Cook)','E-liac (Artivion)','IBE (Gore)','PMEG'];
+var IIA_BRIDGING=['','BeGraft','BeGraft Plus','BeFlared','V12','Radiant','VBX','Viabahn','Covera','Fluency','Solaris','Lifestream','iCover'];
 function ibdSideHtml(prefix, pv){
   var d = pv || {};
   return '<div id="'+prefix+'_wrap" style="background:#0a1628;border:1px solid #1a3652;border-radius:7px;padding:10px 12px;margin-top:8px">'
@@ -1601,44 +1603,114 @@ function initCustomSelect(el, listKey){
   if(!el||el.dataset.customInit)return;
   el.dataset.customInit='1';
   el.dataset.listKey=listKey;
-  // Append previously saved custom options
   var saved=(getCustomOpts()[listKey]||[]);
   saved.forEach(function(v){
     if(!Array.from(el.options).find(function(o){return o.value===v;})){
-      var opt=document.createElement('option');
-      opt.value=v;opt.textContent=v;
-      el.appendChild(opt);
+      var opt=document.createElement('option');opt.value=v;opt.textContent=v;
+      opt.dataset.custom='1';el.appendChild(opt);
     }
   });
-  // Append sentinel
-  var sentinel=document.createElement('option');
-  sentinel.value='__add__';
-  sentinel.textContent='\u002b Add new option\u2026';
-  el.appendChild(sentinel);
-  el.addEventListener('change',function(){
-    if(el.value!=='__add__')return;
-    var name=prompt('Enter new option to add to this list:');
-    if(name&&name.trim()){
-      name=name.trim();
-      var opts=getCustomOpts();
-      if(!opts[listKey])opts[listKey]=[];
-      if(opts[listKey].indexOf(name)===-1)opts[listKey].push(name);
-      _customOpts=opts;
-      saveCustomOpts();
-      // Add to select
-      var newOpt=document.createElement('option');
-      newOpt.value=name;newOpt.textContent=name;
-      el.insertBefore(newOpt,sentinel);
-      el.value=name;
-      el.dispatchEvent(new Event('change'));
-    } else {
-      el.value=el.dataset.prevVal||'';
-    }
-  });
+  var sent=document.createElement('option');
+  sent.value='__manage__';sent.textContent='\u2699\ufe0f Manage options\u2026';
+  el.appendChild(sent);
   el.addEventListener('focus',function(){el.dataset.prevVal=el.value;});
+  el.addEventListener('change',function(){
+    if(el.value==='__manage__'){
+      openOptManager(el,listKey);
+      setTimeout(function(){el.value=el.dataset.prevVal||'';},0);
+    }
+  });
 }
+function openOptManager(el,listKey){
+  _optMgrEl=el;_optMgrListKey=listKey;
+  var overlay=document.getElementById('optMgrOverlay');
+  var title=document.getElementById('optMgrTitle');
+  var addInp=document.getElementById('optMgrAddInp');
+  if(!overlay)return;
+  if(addInp)addInp.value='';
+  var labels={'operator':'Operator','assistant':'Assistant','anesthesiologist':'Anesthesiologist',
+    'tvConfig':'TV Configuration','bridgingStent':'Bridging Stent','closureDev':'Closure Device',
+    'cmdModel':'CMD Model','otsModel':'OTS Device','pmegModel':'PMEG Base Graft',
+    'ibdDevice':'IBD Device','procType':'Procedure Type'};
+  if(title)title.textContent='Manage: '+(labels[listKey]||listKey);
+  renderOptMgrList();
+  overlay.classList.add('open');
+  if(addInp)addInp.focus();
+  overlay.onclick=function(e){if(e.target===overlay)optMgrClose();};
+}
+function renderOptMgrList(){
+  var list=document.getElementById('optMgrList');
+  if(!list||!_optMgrEl)return;
+  list.innerHTML='';
+  Array.from(_optMgrEl.options).forEach(function(opt){
+    if(opt.value==='__manage__'||opt.value==='__add__'||opt.value==='__edit__')return;
+    var row=document.createElement('div');row.className='oml-row';
+    var nameEl=document.createElement('span');nameEl.className='oml-name';nameEl.textContent=opt.textContent;
+    row.appendChild(nameEl);
+    var editBtn=document.createElement('button');editBtn.className='oml-edit';editBtn.textContent='Edit';
+    (function(o,n,b){b.onclick=function(){optMgrEditRow(o,n,b);};})(opt,nameEl,editBtn);
+    row.appendChild(editBtn);
+    var delBtn=document.createElement('button');delBtn.className='oml-del';delBtn.textContent='Del';
+    (function(o){delBtn.onclick=function(){optMgrDelete(o);};})(opt);
+    row.appendChild(delBtn);
+    list.appendChild(row);
+  });
+}
+function optMgrEditRow(opt,nameEl,editBtn){
+  var inp=document.createElement('input');
+  inp.value=opt.textContent;
+  inp.style.cssText='flex:1;background:#081428;border:1px solid #08c8d0;border-radius:6px;padding:5px 8px;color:#dde5f0;font-size:13px;min-width:0';
+  nameEl.parentNode.replaceChild(inp,nameEl);
+  editBtn.textContent='Save';
+  editBtn.onclick=function(){
+    var newVal=inp.value.trim();if(!newVal)return;
+    var oldVal=opt.value;
+    opt.value=newVal;opt.textContent=newVal;
+    var co=getCustomOpts();
+    if(!co[_optMgrListKey])co[_optMgrListKey]=[];
+    var i=co[_optMgrListKey].indexOf(oldVal);
+    if(i>-1)co[_optMgrListKey][i]=newVal;else co[_optMgrListKey].push(newVal);
+    _customOpts=co;saveCustomOpts();
+    updateStaffName(oldVal,newVal);
+    renderOptMgrList();
+  };
+  inp.addEventListener('keydown',function(e){if(e.key==='Enter')editBtn.onclick();});
+  inp.focus();inp.select();
+}
+function optMgrDelete(opt){
+  if(!confirm('Delete "'+opt.textContent+'"?'))return;
+  var val=opt.value;
+  _optMgrEl.removeChild(opt);
+  var co=getCustomOpts();
+  if(co[_optMgrListKey]){var i=co[_optMgrListKey].indexOf(val);if(i>-1)co[_optMgrListKey].splice(i,1);}
+  _customOpts=co;saveCustomOpts();
+  removeStaffName(val);
+  renderOptMgrList();
+}
+function optMgrAdd(){
+  var inp=document.getElementById('optMgrAddInp');
+  if(!inp||!_optMgrEl)return;
+  var name=inp.value.trim();if(!name)return;
+  if(Array.from(_optMgrEl.options).find(function(o){return o.value===name;})){alert('"'+name+'" already exists.');return;}
+  var sent=_optMgrEl.querySelector('option[value="__manage__"]');
+  var newOpt=document.createElement('option');newOpt.value=name;newOpt.textContent=name;newOpt.dataset.custom='1';
+  _optMgrEl.insertBefore(newOpt,sent);_optMgrEl.value=name;
+  var co=getCustomOpts();if(!co[_optMgrListKey])co[_optMgrListKey]=[];
+  if(co[_optMgrListKey].indexOf(name)===-1)co[_optMgrListKey].push(name);
+  _customOpts=co;saveCustomOpts();
+  addStaffName(_optMgrListKey,name);
+  inp.value='';renderOptMgrList();
+}
+function optMgrClose(){
+  var o=document.getElementById('optMgrOverlay');if(o)o.classList.remove('open');
+  _optMgrEl=null;_optMgrListKey=null;
+}
+var _optMgrEl=null,_optMgrListKey=null;
+function addStaffName(role,name){var l=getStaffLists();if(l[role]===undefined)return;if(l[role].indexOf(name)===-1)l[role].push(name);staffLists=l;saveStaffLists();}
+function removeStaffName(val){var l=getStaffLists();['operator','assistant','anesthesiologist'].forEach(function(r){if(!l[r])return;var i=l[r].indexOf(val);if(i>-1)l[r].splice(i,1);});staffLists=l;saveStaffLists();}
+function updateStaffName(o,n){var l=getStaffLists();['operator','assistant','anesthesiologist'].forEach(function(r){if(!l[r])return;var i=l[r].indexOf(o);if(i>-1)l[r][i]=n;});staffLists=l;saveStaffLists();}
+document.addEventListener('DOMContentLoaded',function(){var inp=document.getElementById('optMgrAddInp');if(inp)inp.addEventListener('keydown',function(e){if(e.key==='Enter')optMgrAdd();});});
 
-// Attach to all relevant selects after form renders
 function initAllCustomSelects(){
   var map={
     'tv_ca_Config':'tvConfig','tv_sma_Config':'tvConfig','tv_rra_Config':'tvConfig',
@@ -1651,7 +1723,7 @@ function initAllCustomSelects(){
     'ibd_l_dev':'ibdDevice','ibd_r_dev':'ibdDevice',
     'ibd_l_iiaStent':'bridgingStent','ibd_r_iiaStent':'bridgingStent',
     'f-procType':'procType','f-ana':'anaType',
-    'staff-sel-operator':'staffOp','staff-sel-assistant':'staffAs','staff-sel-anesthesiologist':'staffAn'
+    /* staff selects managed separately via pickStaff/openOptManager */
   };
   Object.keys(map).forEach(function(id){
     var el=document.getElementById(id);
@@ -1745,6 +1817,96 @@ function toggleCmdMfr(){
   }
 }
 
+
+// ── SAFARI-SAFE TIME PICKER ───────────────────────────────────────────────────
+function makeHours(){
+  var o='<option value="">--</option>';
+  for(var h=0;h<24;h++){var v=(h<10?'0':'')+h;o+='<option value="'+v+'">'+v+'</option>';}
+  return o;
+}
+function makeMins(){
+  var o='<option value="">--</option>';
+  for(var m=0;m<60;m++){var v=(m<10?'0':'')+m;o+='<option value="'+v+'">'+v+'</option>';}
+  return o;
+}
+var _HR=makeHours(), _MN=makeMins();
+
+function timePickerHtml(id, label, val){
+  var h='', m='';
+  if(val&&val.indexOf(':')>-1){var p=val.split(':');h=p[0];m=p[1].substring(0,2);}
+  var sel_style='background:#0d1f3c;border:1px solid #1a3652;border-radius:6px;padding:5px 4px;color:#dde5f0;font-size:13px;width:60px';
+  return '<div style="display:flex;flex-direction:column;gap:4px">'
+    +'<label style="font-size:11px;color:#7a90b0;text-transform:uppercase;letter-spacing:.04em">'+label+'</label>'
+    +'<div style="display:flex;align-items:center;gap:4px">'
+    +'<select id="'+id+'-h" onchange="syncTimeVal(\''+id+'\')" style="'+sel_style+'">'
+    +_HR.replace('value="'+h+'"','value="'+h+'" selected')
+    +'</select>'
+    +'<span style="color:#7a90b0;font-weight:700">:</span>'
+    +'<select id="'+id+'-m" onchange="syncTimeVal(\''+id+'\')" style="'+sel_style+'">'
+    +_MN.replace('value="'+m+'"','value="'+m+'" selected')
+    +'</select>'
+    +'<input type="hidden" id="'+id+'" value="'+(val||'')+'"></div></div>';
+}
+
+function timePicker4(pv){
+  var t=pv||{};
+  return '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px">'
+    +timePickerHtml('f-timeAnesStart','Anesthesia Start',t.timeAnesStart||'')
+    +timePickerHtml('f-timeOpStart',  'Operation Start',  t.timeOpStart||'')
+    +timePickerHtml('f-timeOpEnd',    'Operation Finish', t.timeOpEnd||'')
+    +timePickerHtml('f-timeAnesEnd',  'Anesthesia Finish',t.timeAnesEnd||'')
+    +'</div>';
+}
+
+function syncTimeVal(id){
+  var h=document.getElementById(id+'-h');
+  var m=document.getElementById(id+'-m');
+  var hid=document.getElementById(id);
+  if(!hid)return;
+  if(h&&m&&h.value&&m.value) hid.value=h.value+':'+m.value;
+  else hid.value='';
+  calcOpTime();
+}
+
+
+// ── BMI + BSA CALCULATOR ─────────────────────────────────────────────────────
+function calcBodyMetrics(){
+  var wEl=document.getElementById('f-weight');
+  var hEl=document.getElementById('f-height');
+  var bmiEl=document.getElementById('f-bmi');
+  var bsaEl=document.getElementById('f-bsa');
+  var bmiVal=document.getElementById('bmiVal');
+  var bsaVal=document.getElementById('bsaVal');
+  var bmiGrade=document.getElementById('bmiGrade');
+  if(!wEl||!hEl)return;
+  var w=parseFloat(wEl.value);
+  var h=parseFloat(hEl.value);
+  if(!w||!h||w<=0||h<=0){
+    if(bmiVal)bmiVal.textContent='–';
+    if(bsaVal)bsaVal.textContent='–';
+    if(bmiGrade)bmiGrade.textContent='';
+    if(bmiEl)bmiEl.value='';
+    if(bsaEl)bsaEl.value='';
+    return;
+  }
+  var hm=h/100;
+  var bmi=Math.round((w/(hm*hm))*10)/10;
+  // Dubois formula: BSA = 0.007184 × W^0.425 × H^0.725
+  var bsa=Math.round(0.007184*Math.pow(w,0.425)*Math.pow(h,0.725)*100)/100;
+  // BMI grade
+  var grade='',color='#dde5f0';
+  if(bmi<18.5){grade='Underweight';color='#f0b030';}
+  else if(bmi<23){grade='Normal';color='#0db87a';}
+  else if(bmi<25){grade='Overweight (Asian)';color='#f0b030';}
+  else if(bmi<30){grade='Obese I';color='#f09030';}
+  else{grade='Obese II+';color='#e03030';}
+  if(bmiVal){bmiVal.textContent=bmi;}
+  if(bsaVal){bsaVal.textContent=bsa;}
+  if(bmiGrade){bmiGrade.textContent='('+grade+')';bmiGrade.style.color=color;}
+  if(bmiEl)bmiEl.value=bmi;
+  if(bsaEl)bsaEl.value=bsa;
+}
+
 function buildTabs(p){
   var pv=p||{};
   // Zone diagram HTML
@@ -1773,9 +1935,23 @@ function buildTabs(p){
     sh('📋 Registry Status')
     +gr(4,[fld('Date of Registry *',inp('f-dateRegistry','date',pv.dateRegistry||'')),fld('Date of CTA',inp('f-dateCTA','date',pv.dateCTA||'')),fld('Date of Complete Preop Evaluation',inp('f-datePreop','date',pv.datePreop||'')),fld('Patient Status *',sel('f-patientStatus',['','OR Scheduled','Awaiting OR Scheduled','Awaiting Preoperative Evaluation'],pv.patientStatus||''))])     +gr(2,[fld('Graft Plan Sign Date',inp('f-graftPlanSign','date',pv.graftPlanSign||'')),fld('Expected Graft Shipping Date',inp('f-graftShipDate','date',pv.graftShipDate||''))])
     +sh('Patient Identifiers (VASCUNET Core Dataset)')
-    +gr(4,[fld('Case ID *',inp('f-id','text',pv.id||newId())),fld('Procedure Date *',inp('f-procedureDate','date',pv.procedureDate)),fld('Hospital No. (HN)',inp('f-hn','text',pv.hn)),fld('Age (years)',inp('f-age','number',pv.age)),fld('Sex',sel('f-sex',OPTS.sex,pv.sex)),fld('BMI kg/m2',inp('f-bmi','number',pv.bmi)),fld('ASA Class',sel('f-asa',OPTS.asa,pv.asa))])
+    +gr(4,[fld('Case ID *',inp('f-id','text',pv.id||newId())),fld('Procedure Date *',inp('f-procedureDate','date',pv.procedureDate)),fld('Hospital No. (HN)',inp('f-hn','text',pv.hn)),fld('Age (years)',inp('f-age','number',pv.age)),fld('Sex',sel('f-sex',OPTS.sex,pv.sex)),fld('Weight (kg)',"<input id='f-weight' type='number' step='0.1' value='"+(pv.weight||'')+"' "
+    +"oninput=\"calcBodyMetrics()\" style='width:100%;background:#0d1f3c;border:1px solid #1a3652;border-radius:6px;padding:6px 10px;color:#dde5f0;font-size:13px'>"),
+fld('Height (cm)',"<input id='f-height' type='number' step='0.1' value='"+(pv.height||'')+"' "
+    +"oninput=\"calcBodyMetrics()\" style='width:100%;background:#0d1f3c;border:1px solid #1a3652;border-radius:6px;padding:6px 10px;color:#dde5f0;font-size:13px'>"
+    +"<input type='hidden' id='f-bmi' value='"+(pv.bmi||'')+ "'>"
+    +"<input type='hidden' id='f-bsa' value='"+(pv.bsa||'')+ "'>")
+,fld('ASA Class',sel('f-asa',OPTS.asa,pv.asa))])
+    +'<div id="bmiPanel" style="display:flex;gap:24px;align-items:center;padding:10px 14px;'
+    +'background:#0d1f3c;border:1px solid #1a3652;border-radius:8px;margin-bottom:8px;flex-wrap:wrap">'
+    +'<span style="font-size:13px;color:#7a90b0">BMI: '
+    +'<strong id="bmiVal" style="font-size:18px;color:#08c8d0">–</strong>'
+    +' <span id="bmiGrade" style="font-size:12px;margin-left:6px"></span></span>'
+    +'<span style="font-size:13px;color:#7a90b0">BSA: '
+    +'<strong id="bsaVal" style="font-size:18px;color:#08c8d0">–</strong> m²</span>'
+    +'</div>'
     +sh('Comorbidities (VASCUNET Core)')
-    +gr(4,[fld('Hypertension',sel('f-htn',OPTS.yn,pv.htn)),fld('Diabetes Mellitus',sel('f-dm',OPTS.yn,pv.dm)),fld('Dyslipidaemia',sel('f-dyslipaemia',OPTS.yn,pv.dyslipaemia)),fld('Smoking',sel('f-smoking',OPTS.smoking,pv.smoking)),fld('Pack-Years',inp('f-packYears','number',pv.packYears)),fld('CAD / IHD',sel('f-cad',OPTS.yn,pv.cad)),fld('COPD',sel('f-copd',OPTS.yn,pv.copd)),fld('Peripheral Vascular Disease',sel('f-pvd',OPTS.yn,pv.pvd)),fld('CVD / Stroke',sel('f-cvd',OPTS.yn,pv.cvd)),fld('CKD Stage (KDIGO)',sel('f-ckd',OPTS.ckd,pv.ckd)),fld('eGFR',inp('f-egfr','number',pv.egfr))])
+    +gr(4,[fld('Hypertension',sel('f-htn',OPTS.yn,pv.htn)),fld('Diabetes Mellitus',sel('f-dm',OPTS.yn,pv.dm)),fld('Dyslipidaemia',sel('f-dyslipaemia',OPTS.yn,pv.dyslipaemia)),fld('Smoking',sel('f-smoking',OPTS.smoking,pv.smoking)),fld('Pack-Years',inp('f-packYears','number',pv.packYears)),fld('CAD / IHD',sel('f-cad',OPTS.yn,pv.cad)),fld('COPD',sel('f-copd',OPTS.yn,pv.copd)),fld('Peripheral Vascular Disease',sel('f-pvd',OPTS.yn,pv.pvd)),fld('CVD / Stroke',sel('f-cvd',OPTS.yn,pv.cvd)),fld('CKD Stage (KDIGO)',sel('f-ckd',OPTS.ckd,pv.ckd)),fld('Creatinine (µmol/L)',inp('f-creatinine','number',pv.creatinine)),fld('eGFR (ml/min/1.73m²)',inp('f-egfr','number',pv.egfr))])
     +sh('Frailty Assessment (ESVS 2024/2026)')
     +frailtySection(pv),
     // Tab 1: Anatomy
@@ -1827,7 +2003,7 @@ function buildTabs(p){
     +sh('Operating Team')
     +gr(3,[fld('Operator',staffDropdown('operator','operator',pv.operator||'')),fld('Assistant',staffDropdown('assistant','assistant',pv.assistant||'')),fld('Anesthesiologist',staffDropdown('anesthesiologist','anesthesiologist',pv.anesthesiologist||''))])
     +sh('Operative Time (24h format)')
-    +gr(4,[fld('Anesthesia Start',inp('f-timeAnesStart','time',pv.timeAnesStart||'')),fld('Operation Start',inp('f-timeOpStart','time',pv.timeOpStart||'')),fld('Operation Finish',inp('f-timeOpEnd','time',pv.timeOpEnd||'')),fld('Anesthesia Finish',inp('f-timeAnesEnd','time',pv.timeAnesEnd||''))])
+    +timePicker4(pv)
     +'<div class="infobox" id="opTimeCalc" style="display:flex;gap:24px;flex-wrap:wrap">'
     +'<span><strong>Operative time:</strong> <span id="calc-opTime" style="color:#08c8d0">–</span> min</span>'
     +'<span><strong>Anesthesia time:</strong> <span id="calc-anesTime" style="color:#08c8d0">–</span> min</span>'
@@ -2135,7 +2311,7 @@ function showFTab(i){
   document.querySelectorAll('.ftab').forEach(function(t,j){t.classList.toggle('active',j===i);});
   document.getElementById('formBody').innerHTML=formTabs[i]||'';
   if(i===2){attachOpTimeListeners();toggleDeviceOpts();setTimeout(initAllCustomSelects,80);}
-  if(i===0){setTimeout(calcFrailty,50);}
+  if(i===0){setTimeout(calcFrailty,50);setTimeout(calcBodyMetrics,60);}
   if(i===1){setTimeout(toggleCmdMfr,50);}
   if(i===0){setTimeout(calcFrailty,50);}
   // After rendering, resize zone overlay divs to match image
@@ -2171,7 +2347,7 @@ async function saveForm(){
   var fri=collectFrailtyItems();
   var adjA=collectAdjunctAortic();
   calcFrailty();
-  var pt=Object.assign({id:id,dateRegistry:gv('f-dateRegistry'),dateCTA:gv('f-dateCTA'),datePreop:gv('f-datePreop'),patientStatus:gv('f-patientStatus'),graftPlanSign:gv('f-graftPlanSign'),graftShipDate:gv('f-graftShipDate'),procedureDate:gv('f-procedureDate'),hn:gv('f-hn'),age:gv('f-age'),sex:gv('f-sex'),bmi:gv('f-bmi'),asa:gv('f-asa'),htn:gv('f-htn'),dm:gv('f-dm'),dyslipaemia:gv('f-dyslipaemia'),smoking:gv('f-smoking'),packYears:gv('f-packYears'),cad:gv('f-cad'),copd:gv('f-copd'),ckd:gv('f-ckd'),egfr:gv('f-egfr'),pvd:gv('f-pvd'),cvd:gv('f-cvd'),frailtyTool:gv('f-frailtyTool'),frailtyScore:gv('f-frailtyScore'),frailtyGrade:gv('f-frailtyGrade'),presentation:gv('f-presentation'),diagnosis:gv('f-diagnosis'),extent:gv('f-extent'),maxDiam:gv('f-maxDiam'),proxNeck:gv('f-proxNeck'),neckAngle:gv('f-neckAngle'),neckCalc:gv('f-neckCalc'),ifu:gv('f-ifu'),sdm:gv('f-sdm'),procType:gv('f-procType'),deviceStrategy:gv('f-deviceStrategy'),brand:gv('f-brand'),model:gv('f-model'),proxDiam:gv('f-proxDiam'),proxSeal:gv('f-proxSeal'),fenestrations:gv('f-fenestrations'),branches:gv('f-branches'),celiac:gv('f-celiac'),sma:gv('f-sma'),lRenal:gv('f-lRenal'),rRenal:gv('f-rRenal'),lSubcl:gv('f-lSubcl'),ana:gv('f-ana'),csfDrain:gv('f-csfDrain'),spinal:gv('f-spinal'),mapTarget:gv('f-mapTarget'),staged:gv('f-staged'),plannedStrategy:gv('f-plannedStrategy'),cmdManufacturer:gv('f-cmdManufacturer'),operator:gv('f-operator'),assistant:gv('f-assistant'),anesthesiologist:gv('f-anesthesiologist'),timeAnesStart:gv('f-timeAnesStart'),timeOpStart:gv('f-timeOpStart'),timeOpEnd:gv('f-timeOpEnd'),timeAnesEnd:gv('f-timeAnesEnd'),airKerma:gv('f-airKerma'),dap:gv('f-dap'),contrastName:gv('f-contrastName'),co2angio:gvChk('f-co2angio'),cbct:gvChk('f-cbct'),sheath:gv('f-sheath'),guidewire:gv('f-guidewire'),catheter:gv('f-catheter'),orTime:gv('f-orTime'),fluoro:gv('f-fluoro'),contrast:gv('f-contrast'),ebl:gv('f-ebl'),ptSuccess:gv('f-ptSuccess'),tvSuccess:gv('f-tvSuccess'),intraopEL:gv('f-intraopEL'),sci:gv('f-sci'),sciGrade:gv('f-sciGrade'),sciPerm:gv('f-sciPerm'),sciOnset:gv('f-sciOnset'),stroke:gv('f-stroke'),aki:gv('f-aki'),akiStage:gv('f-akiStage'),rrt:gv('f-rrt'),bowel:gv('f-bowel'),mi:gv('f-mi'),icu:gv('f-icu'),hospital:gv('f-hospital'),mort30d:gv('f-mort30d'),cause30d:gv('f-cause30d'),mae:gv('f-mae'),celiacP:gv('f-celiacP'),smaP:gv('f-smaP'),lRenalP:gv('f-lRenalP'),rRenalP:gv('f-rRenalP'),tvi:gv('f-tvi'),tviType:gv('f-tviType'),proxZone:gv('f-proxZone'),distZoneL:gv('f-distZoneL'),distZoneR:gv('f-distZoneR'),zoneExtent:gv('f-zoneExtent'),followups:collectFUs()},access,device,tvs,fri,adjA);
+  var pt=Object.assign({id:id,dateRegistry:gv('f-dateRegistry'),dateCTA:gv('f-dateCTA'),datePreop:gv('f-datePreop'),patientStatus:gv('f-patientStatus'),graftPlanSign:gv('f-graftPlanSign'),graftShipDate:gv('f-graftShipDate'),procedureDate:gv('f-procedureDate'),hn:gv('f-hn'),age:gv('f-age'),sex:gv('f-sex'),weight:gv('f-weight'),height:gv('f-height'),bmi:gv('f-bmi'),bsa:gv('f-bsa'),asa:gv('f-asa'),htn:gv('f-htn'),dm:gv('f-dm'),dyslipaemia:gv('f-dyslipaemia'),smoking:gv('f-smoking'),packYears:gv('f-packYears'),cad:gv('f-cad'),copd:gv('f-copd'),ckd:gv('f-ckd'),creatinine:gv('f-creatinine'),egfr:gv('f-egfr'),pvd:gv('f-pvd'),cvd:gv('f-cvd'),frailtyTool:gv('f-frailtyTool'),frailtyScore:gv('f-frailtyScore'),frailtyGrade:gv('f-frailtyGrade'),presentation:gv('f-presentation'),diagnosis:gv('f-diagnosis'),extent:gv('f-extent'),maxDiam:gv('f-maxDiam'),proxNeck:gv('f-proxNeck'),neckAngle:gv('f-neckAngle'),neckCalc:gv('f-neckCalc'),ifu:gv('f-ifu'),sdm:gv('f-sdm'),procType:gv('f-procType'),deviceStrategy:gv('f-deviceStrategy'),brand:gv('f-brand'),model:gv('f-model'),proxDiam:gv('f-proxDiam'),proxSeal:gv('f-proxSeal'),fenestrations:gv('f-fenestrations'),branches:gv('f-branches'),celiac:gv('f-celiac'),sma:gv('f-sma'),lRenal:gv('f-lRenal'),rRenal:gv('f-rRenal'),lSubcl:gv('f-lSubcl'),ana:gv('f-ana'),csfDrain:gv('f-csfDrain'),spinal:gv('f-spinal'),mapTarget:gv('f-mapTarget'),staged:gv('f-staged'),plannedStrategy:gv('f-plannedStrategy'),cmdManufacturer:gv('f-cmdManufacturer'),operator:gv('f-operator'),assistant:gv('f-assistant'),anesthesiologist:gv('f-anesthesiologist'),timeAnesStart:gv('f-timeAnesStart'),timeOpStart:gv('f-timeOpStart'),timeOpEnd:gv('f-timeOpEnd'),timeAnesEnd:gv('f-timeAnesEnd'),airKerma:gv('f-airKerma'),dap:gv('f-dap'),contrastName:gv('f-contrastName'),co2angio:gvChk('f-co2angio'),cbct:gvChk('f-cbct'),sheath:gv('f-sheath'),guidewire:gv('f-guidewire'),catheter:gv('f-catheter'),orTime:gv('f-orTime'),fluoro:gv('f-fluoro'),contrast:gv('f-contrast'),ebl:gv('f-ebl'),ptSuccess:gv('f-ptSuccess'),tvSuccess:gv('f-tvSuccess'),intraopEL:gv('f-intraopEL'),sci:gv('f-sci'),sciGrade:gv('f-sciGrade'),sciPerm:gv('f-sciPerm'),sciOnset:gv('f-sciOnset'),stroke:gv('f-stroke'),aki:gv('f-aki'),akiStage:gv('f-akiStage'),rrt:gv('f-rrt'),bowel:gv('f-bowel'),mi:gv('f-mi'),icu:gv('f-icu'),hospital:gv('f-hospital'),mort30d:gv('f-mort30d'),cause30d:gv('f-cause30d'),mae:gv('f-mae'),celiacP:gv('f-celiacP'),smaP:gv('f-smaP'),lRenalP:gv('f-lRenalP'),rRenalP:gv('f-rRenalP'),tvi:gv('f-tvi'),tviType:gv('f-tviType'),proxZone:gv('f-proxZone'),distZoneL:gv('f-distZoneL'),distZoneR:gv('f-distZoneR'),zoneExtent:gv('f-zoneExtent'),followups:collectFUs()},access,device,tvs,fri,adjA);
   var btn=document.getElementById('saveBtn');
   btn.disabled=true;btn.textContent='Saving...';
   try{
@@ -2208,5 +2384,18 @@ window.onload=function(){
 };
 
 </script>
+
+<!-- Option Manager Modal -->
+<div id="optMgrOverlay">
+  <div id="optMgrBox">
+    <div id="optMgrTitle">Manage Options</div>
+    <div id="optMgrList"></div>
+    <div id="optMgrAddRow">
+      <input id="optMgrAddInp" type="text" placeholder="New option name">
+      <button id="optMgrAddBtn" onclick="optMgrAdd()">Add</button>
+    </div>
+    <button id="optMgrClose" onclick="optMgrClose()">Done</button>
+  </div>
+</div>
 </body>
 </html>
