@@ -2104,34 +2104,62 @@ async function sha256(str){
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
 }
 
+async function pingAPI(){
+  var el=document.getElementById('syncStatus');
+  if(!el)return;
+  if(!APIURL){el.textContent='⚠️ No API URL set';el.style.color='#f09030';return;}
+  el.textContent='⧗ Connecting…';el.style.color='#7a90b0';
+  try{
+    var r=await fetch(APIURL+'?action=ping&t='+Date.now(),{method:'GET',redirect:'follow'});
+    var j=await r.json();
+    if(j.ok){
+      el.innerHTML='✅ Connected — <span style="color:#4a6080">'+j.sheet+'</span>';
+      el.style.color='#0db87a';
+    } else {
+      el.textContent='⚠️ Sheets error';el.style.color='#f09030';
+    }
+  }catch(e){
+    el.textContent='❌ Offline — using local data';el.style.color='#e03030';
+  }
+}
+
 async function doLogin(){
-  var user = (document.getElementById('loginUser')||{}).value.trim();
-  var pass = (document.getElementById('loginPass')||{}).value;
-  var err  = document.getElementById('loginErr');
-  var spin = document.getElementById('loginSpinner');
-  if(!user||!pass){if(err)err.style.display='block';return;}
-  if(err)err.style.display='none';
-  if(spin)spin.style.display='block';
+  var userEl = document.getElementById('loginUser');
+  var passEl = document.getElementById('loginPass');
+  var errEl  = document.getElementById('loginErr');
+  var spinEl = document.getElementById('loginSpinner');
+  var user   = userEl ? userEl.value.trim() : '';
+  var pass   = passEl ? passEl.value : '';
+  if(!user||!pass){
+    if(errEl){errEl.textContent='Please enter username and password';errEl.style.display='block';}
+    return;
+  }
+  if(errEl)errEl.style.display='none';
+  if(spinEl)spinEl.style.display='block';
+  if(!APIURL){
+    if(spinEl)spinEl.style.display='none';
+    if(errEl){errEl.textContent='No API URL set — use Change API URL below';errEl.style.display='block';}
+    return;
+  }
   try{
     var hash = await sha256(pass);
     var url  = APIURL+'?action=login&username='+encodeURIComponent(user)+'&passwordHash='+encodeURIComponent(hash)+'&t='+Date.now();
     var r    = await fetch(url,{method:'GET',redirect:'follow'});
     var j    = await r.json();
-    if(spin)spin.style.display='none';
+    if(spinEl)spinEl.style.display='none';
     if(j.ok){
-      currentUser = {username:j.username, role:j.role, displayName:j.displayName};
-      // Save session
-      try{localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser));}catch(e){}
+      currentUser={username:j.username,role:j.role,displayName:j.displayName};
+      try{localStorage.setItem(SESSION_KEY,JSON.stringify(currentUser));}catch(e){}
       showApp();
       applyRoleUI();
       loadData();
       pingAPI();
     } else {
-      if(err){err.textContent=j.error||'Invalid username or password';err.style.display='block';}
+      if(errEl){errEl.textContent=j.error||'Invalid username or password';errEl.style.display='block';}
     }
   }catch(e){
-    if(spin)spin.style.display='none';
-    if(err){err.textContent='Connection failed: '+e.message;err.style.display='block';}
+    if(spinEl)spinEl.style.display='none';
+    if(errEl){errEl.textContent='Connection failed: '+e.message;errEl.style.display='block';}
   }
 }
 
@@ -2139,9 +2167,13 @@ function tryRestoreSession(){
   try{
     var s=localStorage.getItem(SESSION_KEY);
     if(s){
-      currentUser=JSON.parse(s);
-      if(currentUser&&currentUser.username&&currentUser.role){
-        showApp();applyRoleUI();loadData();pingAPI();
+      var u=JSON.parse(s);
+      if(u&&u.username&&u.role){
+        currentUser=u;
+        showApp();
+        applyRoleUI();
+        loadData();
+        pingAPI();
         return true;
       }
     }
@@ -2815,7 +2847,11 @@ async function testConn(){
   }catch(err){APIURL='';res.textContent='Failed: '+err.message;res.style.color='#e03030';}
 }
 function startDemo(){isDemo=true;APIURL='DEMO';patients=JSON.parse(JSON.stringify(DEMO));showApp();document.getElementById('connLbl').textContent='Demo mode';document.getElementById('connDot').className='dot amber';document.getElementById('demoBar').style.display='block';renderAll();}
-function showApp(){document.getElementById('setup').style.display='none';document.getElementById('app').style.display='flex';}
+function showApp(){
+  var ls=document.getElementById('loginScreen');if(ls)ls.style.display='none';
+  document.getElementById('setup').style.display='none';
+  document.getElementById('app').style.display='flex';
+}
 function resetSetup(){localStorage.removeItem('ev5');APIURL='';isDemo=false;document.getElementById('app').style.display='none';document.getElementById('setup').style.display='flex';}
 window.onload=function(){
   showApp();loadData();
