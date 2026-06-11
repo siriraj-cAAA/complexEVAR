@@ -2023,20 +2023,27 @@ function openApiSettings(){
   var overlay = document.getElementById('apiSettingsOverlay');
   var pinStep = document.getElementById('apiPinStep');
   var urlStep = document.getElementById('apiUrlStep');
-  var pinInp  = document.getElementById('apiPinInp');
-  var pinErr  = document.getElementById('apiPinErr');
+  var curUrl  = document.getElementById('apiCurrentUrl');
   if(!overlay)return;
-  // Reset to PIN step
-  pinStep.style.display = 'block';
-  urlStep.style.display = 'none';
-  pinErr.style.display  = 'none';
-  pinInp.value = '';
-  overlay.style.display = 'flex';
-  setTimeout(function(){pinInp.focus();},100);
-  // Close on overlay click
-  overlay.onclick = function(e){ if(e.target===overlay) closeApiSettings(); };
-  // Enter key
-  pinInp.onkeydown = function(e){ if(e.key==='Enter') checkApiPin(); };
+  overlay.style.display='flex';
+  overlay.onclick=function(e){if(e.target===overlay)closeApiSettings();};
+  // If already logged in as Admin, skip PIN
+  if(currentUser && currentUser.role==='Admin'){
+    pinStep.style.display='none';
+    urlStep.style.display='block';
+    if(curUrl)curUrl.textContent=APIURL||'(not set)';
+    var inp=document.getElementById('apiNewUrl');
+    if(inp){inp.value='';inp.focus();}
+  } else {
+    // Show PIN step for non-logged-in access
+    pinStep.style.display='block';
+    urlStep.style.display='none';
+    var pinInp=document.getElementById('apiPinInp');
+    var pinErr=document.getElementById('apiPinErr');
+    if(pinErr)pinErr.style.display='none';
+    if(pinInp){pinInp.value='';pinInp.focus();}
+    if(pinInp)pinInp.onkeydown=function(e){if(e.key==='Enter')checkApiPin();};
+  }
 }
 
 function checkApiPin(){
