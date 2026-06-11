@@ -201,6 +201,15 @@ input:focus,select:focus{border-color:#08c8d0}
     <button class="login-btn" onclick="doLogin()">Sign In</button>
     <div class="login-err" id="loginErr">Invalid username or password</div>
     <div id="loginSpinner" style="text-align:center;color:#7a90b0;font-size:12px;margin-top:10px;display:none">⧗ Authenticating…</div>
+    <div style="margin-top:20px;border-top:1px solid #1a3652;padding-top:14px">
+      <button onclick="showEmergencyApiSetup()" style="width:100%;background:none;border:1px solid #1a3652;color:#4a6080;border-radius:6px;padding:7px;font-size:11px;cursor:pointer">⚙️ Change API URL (no login required)</button>
+      <div id="emergencyApiBox" style="display:none;margin-top:10px">
+        <div style="font-size:11px;color:#7a90b0;margin-bottom:6px">Paste new Google Apps Script URL:</div>
+        <input id="emergencyApiInp" type="text" placeholder="https://script.google.com/macros/s/.../exec"
+          style="width:100%;background:#081428;border:1px solid #1a6fd4;border-radius:6px;padding:8px 10px;color:#dde5f0;font-size:12px;box-sizing:border-box;margin-bottom:8px">
+        <button onclick="saveEmergencyApiUrl()" style="width:100%;background:#1a6fd4;border:none;color:#fff;border-radius:6px;padding:7px;font-size:12px;cursor:pointer;font-weight:600">Save URL</button>
+      </div>
+    </div>
   </div>
 </div>
 <div id="setup">
