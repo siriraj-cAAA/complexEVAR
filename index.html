@@ -208,7 +208,12 @@ input:focus,select:focus{border-color:#08c8d0}
           <div style="font-size:11px;color:#7a90b0;margin-bottom:6px">Paste new Google Apps Script URL:</div>
           <input id="emergencyApiInp" type="text" placeholder="https://script.google.com/macros/s/.../exec"
             style="width:100%;background:#081428;border:1px solid #1a6fd4;border-radius:6px;padding:8px 10px;color:#dde5f0;font-size:12px;box-sizing:border-box;margin-bottom:8px">
-          <button onclick="saveEmergencyApiUrl()" style="width:100%;background:#1a6fd4;border:none;color:#fff;border-radius:6px;padding:7px;font-size:12px;cursor:pointer;font-weight:600">Save URL</button>
+          <button onclick="(function(){
+  var u=document.getElementById('emergencyApiInp').value.trim();
+  if(!u||u.indexOf('script.google.com/macros')<0){alert('Invalid URL');return;}
+  try{localStorage.setItem('ev5',u);APIURL=u;alert('Saved! Now try logging in:\nUsername: admin\nPassword: admin1234');}
+  catch(e){alert('Error: '+e.message);}
+})()" style="width:100%;background:#1a6fd4;border:none;color:#fff;border-radius:6px;padding:7px;font-size:12px;cursor:pointer;font-weight:600">Save URL</button>
         </div>
       </details>
     </div>
