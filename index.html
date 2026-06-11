@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>Siriraj Complex EVAR Registry</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -12,6 +15,22 @@ input,select,button{font-family:inherit}
 ::-webkit-scrollbar-track{background:#0b1e33}
 ::-webkit-scrollbar-thumb{background:#1e3d5c;border-radius:3px}
 /* Layout */
+#loginScreen{display:flex;min-height:100vh;align-items:center;justify-content:center;background:#07101d}
+.login-box{background:#0d1f3c;border:1px solid #1a3652;border-radius:14px;padding:36px 40px;width:360px;max-width:95vw;box-shadow:0 8px 40px rgba(0,0,0,.6)}
+.login-logo{text-align:center;margin-bottom:24px}
+.login-title{font-size:20px;font-weight:800;color:#dde5f0;text-align:center;margin-bottom:4px}
+.login-sub{font-size:12px;color:#4a6080;text-align:center;margin-bottom:24px}
+.login-field{margin-bottom:14px}
+.login-field label{display:block;font-size:11px;color:#7a90b0;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px}
+.login-field input{width:100%;background:#081428;border:1px solid #1a3652;border-radius:7px;padding:10px 14px;color:#dde5f0;font-size:14px;box-sizing:border-box;outline:none}
+.login-field input:focus{border-color:#1a6fd4}
+.login-btn{width:100%;background:#1a6fd4;border:none;color:#fff;border-radius:7px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;margin-top:4px}
+.login-btn:hover{background:#1560c0}
+.login-err{color:#e03030;font-size:12px;text-align:center;margin-top:10px;display:none}
+.login-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.role-admin{background:#1a3060;color:#5a9eff;border:1px solid #1a6fd4}
+.role-editor{background:#0d2a1a;color:#0db87a;border:1px solid #0db87a}
+.role-viewer{background:#1a1a0d;color:#f0b030;border:1px solid #f0b030}
 #setup{display:none;min-height:100vh;overflow-y:auto;justify-content:center;padding:40px 20px 60px;background:#07101d}
 #app{display:none;height:100vh;overflow:hidden}
 .app-inner{display:flex;height:100%}
@@ -163,6 +182,27 @@ input:focus,select:focus{border-color:#08c8d0}
 <body>
 
 <!-- SETUP SCREEN -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo">
+      <div style="font-size:28px;font-weight:900;color:#08c8d0;letter-spacing:-.02em">cEVAR</div>
+      <div style="font-size:11px;color:#4a6080;letter-spacing:.08em;margin-top:2px">SIRIRAJ AORTIC CENTER</div>
+    </div>
+    <div class="login-title">Registry Login</div>
+    <div class="login-sub">SVS 2020 · ESVS 2024 · ESVS 2026</div>
+    <div class="login-field">
+      <label>Username</label>
+      <input id="loginUser" type="text" placeholder="Enter username" autocomplete="username" onkeydown="if(event.key==='Enter')document.getElementById('loginPass').focus()">
+    </div>
+    <div class="login-field">
+      <label>Password</label>
+      <input id="loginPass" type="password" placeholder="Enter password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="login-btn" onclick="doLogin()">Sign In</button>
+    <div class="login-err" id="loginErr">Invalid username or password</div>
+    <div id="loginSpinner" style="text-align:center;color:#7a90b0;font-size:12px;margin-top:10px;display:none">⧗ Authenticating…</div>
+  </div>
+</div>
 <div id="setup">
 <div class="setup-inner">
   <div style="text-align:center;margin-bottom:28px">
@@ -205,9 +245,14 @@ input:focus,select:focus{border-color:#08c8d0}
       <button class="nb active" id="nb-dashboard" onclick="showPg('dashboard')"><span class="ni">&#9670;</span> Dashboard</button>
       <button class="nb" id="nb-list" onclick="showPg('list')"><span class="ni">&#8803;</span> Patient Registry</button>
       <button class="nb" id="nb-export" onclick="showPg('export')"><span class="ni">&#8659;</span> Export / Data</button>
+      <div id="userBadge" style="padding:8px 10px;font-size:12px;display:flex;align-items:center;gap:6px;border-bottom:1px solid #1a3652;margin-bottom:4px"></div>
       <button class="newnbtn" onclick="openForm(null)">+ New Case</button>
+      <button id="userMgmtBtn" onclick="openUserMgmt()" style="display:none;margin:4px 7px 0;width:calc(100% - 14px);padding:6px;background:#0d1f3c;border:1px solid #1a3652;color:#7a90b0;border-radius:5px;cursor:pointer;font-size:11px">👥 Manage Users</button>
+      <button onclick="changeOwnPassword()" style="margin:4px 7px 0;width:calc(100% - 14px);padding:6px;background:#0d1f3c;border:1px solid #1a3652;color:#7a90b0;border-radius:5px;cursor:pointer;font-size:11px">🔒 Change Password</button>
+      <button onclick="doLogout()" style="margin:4px 7px 0;width:calc(100% - 14px);padding:6px;background:#1a0d0d;border:1px solid #5a2020;color:#e03030;border-radius:5px;cursor:pointer;font-size:11px">← Logout</button>
     </nav>
     <div id="syncStatus" style="font-size:11px;padding:8px 12px;border-top:1px solid #1a3652;color:#7a90b0;min-height:28px;display:flex;align-items:center;gap:6px">⧗ Initializing…</div>
+    <div style="padding:8px 10px;border-top:1px solid #1a3652"><button onclick="openApiSettings()" style="width:100%;background:#0d1f3c;border:1px solid #1a3652;color:#7a90b0;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer;">⚙️ Change API URL</button></div>
     <div class="sb-foot">
       <div style="margin-bottom:5px"><span class="dot amber" id="connDot"></span><span id="connLabel">Connecting...</span></div>
       <div id="syncTime" style="margin-bottom:5px"></div>
@@ -1949,6 +1994,310 @@ function initDiagnosisSelects(){
   });
 }
 
+
+// ── API SETTINGS (PIN-protected) ─────────────────────────────────────────────
+var API_PIN_KEY  = 'cEVAR_adminPin_v1';
+var API_PIN_DEFAULT = '2567';  // Default PIN — change on first login
+
+function getAdminPin(){
+  return localStorage.getItem(API_PIN_KEY) || API_PIN_DEFAULT;
+}
+
+function openApiSettings(){
+  var overlay = document.getElementById('apiSettingsOverlay');
+  var pinStep = document.getElementById('apiPinStep');
+  var urlStep = document.getElementById('apiUrlStep');
+  var pinInp  = document.getElementById('apiPinInp');
+  var pinErr  = document.getElementById('apiPinErr');
+  if(!overlay)return;
+  // Reset to PIN step
+  pinStep.style.display = 'block';
+  urlStep.style.display = 'none';
+  pinErr.style.display  = 'none';
+  pinInp.value = '';
+  overlay.style.display = 'flex';
+  setTimeout(function(){pinInp.focus();},100);
+  // Close on overlay click
+  overlay.onclick = function(e){ if(e.target===overlay) closeApiSettings(); };
+  // Enter key
+  pinInp.onkeydown = function(e){ if(e.key==='Enter') checkApiPin(); };
+}
+
+function checkApiPin(){
+  var pinInp = document.getElementById('apiPinInp');
+  var pinErr = document.getElementById('apiPinErr');
+  var pinStep= document.getElementById('apiPinStep');
+  var urlStep= document.getElementById('apiUrlStep');
+  var curUrl = document.getElementById('apiCurrentUrl');
+  if(pinInp.value === getAdminPin()){
+    pinStep.style.display = 'none';
+    urlStep.style.display = 'block';
+    if(curUrl) curUrl.textContent = APIURL || '(not set)';
+    var newUrlInp = document.getElementById('apiNewUrl');
+    if(newUrlInp){ newUrlInp.value = ''; newUrlInp.focus(); }
+  } else {
+    pinErr.style.display = 'block';
+    pinInp.value = '';
+    pinInp.focus();
+  }
+}
+
+function saveApiUrl(){
+  var inp = document.getElementById('apiNewUrl');
+  var err = document.getElementById('apiUrlErr');
+  var url = inp ? inp.value.trim() : '';
+  if(!url || url.indexOf('script.google.com/macros') < 0){
+    if(err) err.style.display = 'block';
+    return;
+  }
+  if(err) err.style.display = 'none';
+  // Save new URL
+  APIURL = url;
+  localStorage.setItem('ev5', url);
+  closeApiSettings();
+  // Reconnect
+  pingAPI();
+  loadData();
+  toast('\u2705 API URL updated — reconnecting\u2026','ok');
+}
+
+function changeApiPin(){
+  var inp = document.getElementById('apiNewPin');
+  var msg = document.getElementById('apiPinChanged');
+  var pin = inp ? inp.value.trim() : '';
+  if(!pin || pin.length < 4){ alert('PIN must be 4-8 digits'); return; }
+  localStorage.setItem(API_PIN_KEY, pin);
+  if(msg) msg.style.display = 'block';
+  if(inp) inp.value = '';
+  setTimeout(function(){ if(msg) msg.style.display = 'none'; }, 3000);
+}
+
+function closeApiSettings(){
+  var overlay = document.getElementById('apiSettingsOverlay');
+  if(overlay) overlay.style.display = 'none';
+}
+
+
+// ── AUTHENTICATION SYSTEM ─────────────────────────────────────────────────────
+var SESSION_KEY  = 'cEVAR_session_v1';
+var currentUser  = null; // {username, role, displayName}
+
+// SHA-256 using SubtleCrypto
+async function sha256(str){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+async function doLogin(){
+  var user = (document.getElementById('loginUser')||{}).value.trim();
+  var pass = (document.getElementById('loginPass')||{}).value;
+  var err  = document.getElementById('loginErr');
+  var spin = document.getElementById('loginSpinner');
+  if(!user||!pass){if(err)err.style.display='block';return;}
+  if(err)err.style.display='none';
+  if(spin)spin.style.display='block';
+  try{
+    var hash = await sha256(pass);
+    var url  = APIURL+'?action=login&username='+encodeURIComponent(user)+'&passwordHash='+encodeURIComponent(hash)+'&t='+Date.now();
+    var r    = await fetch(url,{method:'GET',redirect:'follow'});
+    var j    = await r.json();
+    if(spin)spin.style.display='none';
+    if(j.ok){
+      currentUser = {username:j.username, role:j.role, displayName:j.displayName};
+      // Save session
+      try{localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser));}catch(e){}
+      showApp();
+      applyRoleUI();
+      loadData();
+      pingAPI();
+    } else {
+      if(err){err.textContent=j.error||'Invalid username or password';err.style.display='block';}
+    }
+  }catch(e){
+    if(spin)spin.style.display='none';
+    if(err){err.textContent='Connection failed: '+e.message;err.style.display='block';}
+  }
+}
+
+function tryRestoreSession(){
+  try{
+    var s=localStorage.getItem(SESSION_KEY);
+    if(s){
+      currentUser=JSON.parse(s);
+      if(currentUser&&currentUser.username&&currentUser.role){
+        showApp();applyRoleUI();loadData();pingAPI();
+        return true;
+      }
+    }
+  }catch(e){}
+  return false;
+}
+
+function doLogout(){
+  currentUser=null;
+  try{localStorage.removeItem(SESSION_KEY);}catch(e){}
+  document.getElementById('loginScreen').style.display='flex';
+  document.getElementById('app').style.display='none';
+  document.getElementById('loginUser').value='';
+  document.getElementById('loginPass').value='';
+  var err=document.getElementById('loginErr');if(err)err.style.display='none';
+}
+
+function applyRoleUI(){
+  if(!currentUser)return;
+  var role=currentUser.role;
+  // Update user badge in sidebar
+  var badge=document.getElementById('userBadge');
+  if(badge){
+    badge.innerHTML='<span class="login-badge role-'+role.toLowerCase()+'">'+role+'</span>'
+      +' <span style="font-size:12px;color:#dde5f0">'+esc(currentUser.displayName||currentUser.username)+'</span>';
+  }
+  // Role-based UI
+  var isAdmin  = role==='Admin';
+  var isEditor = role==='Admin'||role==='Editor';
+  // Hide New Case button for Viewer
+  var newBtn=document.querySelector('.newnbtn');
+  if(newBtn)newBtn.style.display=isEditor?'block':'none';
+  // Hide API settings for non-Admin
+  var apiBtn=document.querySelector('button[onclick="openApiSettings()"]');
+  if(apiBtn)apiBtn.style.display=isAdmin?'block':'none';
+  // Hide User Management for non-Admin
+  var umBtn=document.getElementById('userMgmtBtn');
+  if(umBtn)umBtn.style.display=isAdmin?'block':'none';
+}
+
+function canEdit(){return currentUser&&(currentUser.role==='Admin'||currentUser.role==='Editor');}
+function canDelete(){return currentUser&&currentUser.role==='Admin';}
+function canAdmin(){return currentUser&&currentUser.role==='Admin';}
+
+// ── USER MANAGEMENT (Admin only) ──────────────────────────────────────────────
+var _allUsers=[];
+
+async function openUserMgmt(){
+  if(!canAdmin()){alert('Admin only');return;}
+  var overlay=document.getElementById('userMgmtOverlay');
+  if(!overlay)return;
+  overlay.style.display='flex';
+  overlay.onclick=function(e){if(e.target===overlay)closeUserMgmt();};
+  await refreshUserList();
+}
+
+function closeUserMgmt(){
+  var o=document.getElementById('userMgmtOverlay');
+  if(o)o.style.display='none';
+}
+
+async function refreshUserList(){
+  var url=APIURL+'?action=getUsers&t='+Date.now();
+  try{
+    var r=await fetch(url,{redirect:'follow'});
+    var j=await r.json();
+    _allUsers=j.users||[];
+    renderUserList();
+  }catch(e){console.error('getUsers failed:',e);}
+}
+
+function renderUserList(){
+  var tb=document.getElementById('userListBody');
+  if(!tb)return;
+  tb.innerHTML=_allUsers.map(function(u){
+    return '<tr>'
+      +'<td style="padding:8px 10px;font-size:13px;color:#dde5f0">'+esc(u.username)+'</td>'
+      +'<td style="padding:8px 10px;font-size:13px">'+esc(u.displayName)+'</td>'
+      +'<td style="padding:8px 10px"><span class="login-badge role-'+u.role.toLowerCase()+'">'+u.role+'</span></td>'
+      +'<td style="padding:8px 10px;font-size:11px;color:#4a6080">'+(u.lastLogin?u.lastLogin.substring(0,10):'Never')+'</td>'
+      +'<td style="padding:8px 10px;white-space:nowrap">'
+      +'<button onclick="editUser(\''+esc(u.username)+'\')" style="background:#0d1f3c;border:1px solid #1a6fd4;color:#1a6fd4;border-radius:5px;padding:3px 10px;font-size:11px;cursor:pointer;margin-right:4px">Edit</button>'
+      +(u.username!==currentUser.username
+        ?'<button onclick="deleteUser(\''+esc(u.username)+'\')" style="background:#0d1f3c;border:1px solid #e03030;color:#e03030;border-radius:5px;padding:3px 10px;font-size:11px;cursor:pointer">Del</button>'
+        :'')
+      +'</td>'
+      +'</tr>';
+  }).join('');
+}
+
+function showAddUserForm(){
+  document.getElementById('addUserForm').style.display='block';
+  document.getElementById('newUsername').focus();
+}
+
+async function saveNewUser(){
+  var uname=document.getElementById('newUsername').value.trim();
+  var dname=document.getElementById('newDisplayName').value.trim();
+  var role =document.getElementById('newRole').value;
+  var pass =document.getElementById('newPassword').value;
+  if(!uname||!dname||!role||!pass){alert('All fields required');return;}
+  var hash=await sha256(pass);
+  var fd=new FormData();
+  fd.append('action','upsertUser');
+  fd.append('data',JSON.stringify({username:uname,displayName:dname,role:role,passwordHash:hash,active:'Y'}));
+  try{
+    var r=await fetch(APIURL,{method:'POST',body:fd,redirect:'follow'});
+    var j=await r.json();
+    if(j.saved){
+      toast('User '+j.saved+' '+j.action,'ok');
+      document.getElementById('addUserForm').style.display='none';
+      ['newUsername','newDisplayName','newPassword'].forEach(function(id){document.getElementById(id).value='';});
+      await refreshUserList();
+    } else {toast('Error: '+(j.error||'unknown'),'err');}
+  }catch(e){toast('Failed: '+e.message,'err');}
+}
+
+function editUser(username){
+  var u=_allUsers.find(function(x){return x.username===username;});
+  if(!u)return;
+  var newPass=prompt('New password for '+username+' (leave blank to keep current):');
+  var newRole=prompt('Role (Admin/Editor/Viewer) — current: '+u.role+':',u.role);
+  if(!newRole||!['Admin','Editor','Viewer'].includes(newRole)){alert('Invalid role');return;}
+  sha256(newPass||'').then(function(hash){
+    var data={username:username,role:newRole,displayName:u.displayName};
+    if(newPass)data.passwordHash=hash;
+    var fd=new FormData();
+    fd.append('action','upsertUser');
+    fd.append('data',JSON.stringify(data));
+    fetch(APIURL,{method:'POST',body:fd,redirect:'follow'})
+      .then(function(r){return r.json();})
+      .then(function(j){
+        if(j.saved){toast('Updated '+j.saved,'ok');refreshUserList();}
+        else toast('Error: '+(j.error||''),'err');
+      });
+  });
+}
+
+async function deleteUser(username){
+  if(!confirm('Delete user "'+username+'"? This cannot be undone.'))return;
+  var url=APIURL+'?action=deleteUser&username='+encodeURIComponent(username)+'&t='+Date.now();
+  try{
+    var r=await fetch(url,{redirect:'follow'});
+    var j=await r.json();
+    if(j.deleted){toast('Deleted user: '+j.deleted,'ok');await refreshUserList();}
+    else toast('Error: '+(j.error||''),'err');
+  }catch(e){toast('Failed: '+e.message,'err');}
+}
+
+async function changeOwnPassword(){
+  var oldP=prompt('Current password:');
+  if(!oldP)return;
+  var newP=prompt('New password (min 6 chars):');
+  if(!newP||newP.length<6){alert('Password too short');return;}
+  var newP2=prompt('Confirm new password:');
+  if(newP!==newP2){alert('Passwords do not match');return;}
+  // Verify old password
+  var oldHash=await sha256(oldP);
+  var url=APIURL+'?action=login&username='+encodeURIComponent(currentUser.username)+'&passwordHash='+encodeURIComponent(oldHash)+'&t='+Date.now();
+  var r=await fetch(url,{redirect:'follow'});
+  var j=await r.json();
+  if(!j.ok){alert('Current password incorrect');return;}
+  var newHash=await sha256(newP);
+  var fd=new FormData();
+  fd.append('action','upsertUser');
+  fd.append('data',JSON.stringify({username:currentUser.username,passwordHash:newHash}));
+  var r2=await fetch(APIURL,{method:'POST',body:fd,redirect:'follow'});
+  var j2=await r2.json();
+  if(j2.saved)toast('Password changed successfully','ok');
+  else toast('Failed: '+(j2.error||''),'err');
+}
+
 function buildTabs(p){
   var pv=p||{};
   // Zone diagram HTML
@@ -2133,17 +2482,26 @@ async function api(action,data){
   }
   if(!APIURL)throw new Error('No API URL configured');
   var url=APIURL;
-  // Apps Script uses GET + URL params (avoids CORS preflight)
+  var r;
+  // Use GET for read-only actions, POST for write actions (avoids URL length limit)
   if(action==='load'){
     url+=('?action=getAll&t='+Date.now());
-  } else if(action==='save'){
-    url+=('?action=upsert&data='+encodeURIComponent(JSON.stringify(data))+'&t='+Date.now());
-  } else if(action==='delete'){
-    url+=('?action=delete&id='+encodeURIComponent(data.id)+'&t='+Date.now());
+    r=await fetch(url,{method:'GET',redirect:'follow'});
   } else if(action==='ping'){
     url+=('?action=ping&t='+Date.now());
+    r=await fetch(url,{method:'GET',redirect:'follow'});
+  } else if(action==='save'){
+    // POST via form-encoded to avoid URL length limit (167 fields = very long JSON)
+    var formData=new FormData();
+    formData.append('action','upsert');
+    formData.append('data',JSON.stringify(data));
+    r=await fetch(url,{method:'POST',body:formData,redirect:'follow'});
+  } else if(action==='delete'){
+    var formData2=new FormData();
+    formData2.append('action','delete');
+    formData2.append('id',data.id);
+    r=await fetch(url,{method:'POST',body:formData2,redirect:'follow'});
   }
-  var r=await fetch(url,{method:'GET',redirect:'follow'});
   var j=await r.json();
   if(j.error)throw new Error(j.error);
   return j;
@@ -2157,9 +2515,21 @@ async function savePatient(pt){
   renderAll();
   if(!isDemo){
     try{
-      await api('save',pt);
+      var result=await api('save',pt);
+      if(result&&result.saved){
+        var ss=document.getElementById('syncStatus');
+        if(ss){
+          ss.innerHTML='✅ Saved to Google Sheets: <strong>'+result.saved+'</strong> ('+(result.action||'ok')+') at '+new Date().toLocaleTimeString();
+          ss.style.color='#0db87a';
+        }
+      } else {
+        throw new Error(result&&result.error?result.error:'Unknown error');
+      }
     }catch(e){
-      toast('Google Sheets sync failed: '+e.message,'err');
+      toast('❌ Google Sheets sync failed: '+e.message,'err');
+      var ss=document.getElementById('syncStatus');
+      if(ss){ss.textContent='❌ Sync failed: '+e.message;ss.style.color='#e03030';}
+      console.error('Sheets save error:',e);
     }
   }
 }
@@ -2275,8 +2645,8 @@ function renderList(){
       +'<td>'+(p.mae==='Y'?'<span style="color:#f09030">Y</span>':'N')+'</td>'
       +'<td>'+(p.mort30d==='Y'?'<span style="color:#e03030;font-weight:700">Y</span>':'N')+'</td>'
       +'<td style="white-space:nowrap">'
-      +'<button class="btn bc btn-sm" onclick="editPt(\''+esc(p.id)+'\')" >Edit</button> '
-      +'<button class="btn btn-sm" style="background:#3a1520;border-color:#e03030;color:#e03030" onclick="delPt(\''+esc(p.id)+'\')" >Del</button>'
+      +(canEdit()?'<button class="btn bc btn-sm" onclick="editPt(\''+esc(p.id)+'\')" >Edit</button> ':'')
+      +(canDelete()?'<button class="btn btn-sm" style="background:#3a1520;border-color:#e03030;color:#e03030" onclick="delPt(\''+esc(p.id)+'\')" >Del</button>':'')
       +'</td>'
       +'</tr>';
   }).join('');
@@ -2447,6 +2817,96 @@ window.onload=function(){
       <button id="optMgrAddBtn" onclick="optMgrAdd()">Add</button>
     </div>
     <button id="optMgrClose" onclick="optMgrClose()">Done</button>
+  </div>
+</div>
+
+<!-- API Settings Modal -->
+<div id="apiSettingsOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9100;display:none;align-items:center;justify-content:center">
+  <div style="background:#0d1f3c;border:1px solid #1a3652;border-radius:12px;padding:28px 32px;width:420px;max-width:95vw;box-shadow:0 8px 40px rgba(0,0,0,.7)">
+    <div style="font-size:16px;font-weight:700;color:#dde5f0;margin-bottom:6px">⚙️ API Settings</div>
+    <div style="font-size:12px;color:#7a90b0;margin-bottom:20px">PIN protected — admin only</div>
+    <!-- PIN entry -->
+    <div id="apiPinStep">
+      <label style="font-size:12px;color:#7a90b0;display:block;margin-bottom:6px">Enter Admin PIN</label>
+      <input id="apiPinInp" type="password" maxlength="8" placeholder="Enter PIN"
+        style="width:100%;background:#081428;border:1px solid #1a3652;border-radius:6px;padding:8px 12px;color:#dde5f0;font-size:15px;letter-spacing:4px;box-sizing:border-box;margin-bottom:12px">
+      <div id="apiPinErr" style="color:#e03030;font-size:12px;margin-bottom:10px;display:none">Incorrect PIN</div>
+      <div style="display:flex;gap:10px">
+        <button onclick="checkApiPin()" style="flex:1;background:#1a6fd4;border:none;color:#fff;border-radius:6px;padding:8px;font-size:13px;cursor:pointer;font-weight:600">Unlock</button>
+        <button onclick="closeApiSettings()" style="flex:1;background:#0d1f3c;border:1px solid #1a3652;color:#7a90b0;border-radius:6px;padding:8px;font-size:13px;cursor:pointer">Cancel</button>
+      </div>
+    </div>
+    <!-- URL change (shown after PIN) -->
+    <div id="apiUrlStep" style="display:none">
+      <label style="font-size:12px;color:#7a90b0;display:block;margin-bottom:6px">Current API URL</label>
+      <div id="apiCurrentUrl" style="font-size:11px;color:#4a6080;background:#081428;padding:8px;border-radius:5px;margin-bottom:16px;word-break:break-all;border:1px solid #1a2a3a"></div>
+      <label style="font-size:12px;color:#7a90b0;display:block;margin-bottom:6px">New Google Apps Script URL</label>
+      <input id="apiNewUrl" type="text" placeholder="https://script.google.com/macros/s/.../exec"
+        style="width:100%;background:#081428;border:1px solid #1a3652;border-radius:6px;padding:8px 12px;color:#dde5f0;font-size:12px;box-sizing:border-box;margin-bottom:6px">
+      <div id="apiUrlErr" style="color:#e03030;font-size:12px;margin-bottom:10px;display:none">Please enter a valid Apps Script URL</div>
+      <div style="display:flex;gap:10px;margin-top:12px">
+        <button onclick="saveApiUrl()" style="flex:1;background:#0db87a;border:none;color:#fff;border-radius:6px;padding:8px;font-size:13px;cursor:pointer;font-weight:600">Save &amp; Reconnect</button>
+        <button onclick="closeApiSettings()" style="flex:1;background:#0d1f3c;border:1px solid #1a3652;color:#7a90b0;border-radius:6px;padding:8px;font-size:13px;cursor:pointer">Cancel</button>
+      </div>
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid #1a3652">
+        <label style="font-size:12px;color:#7a90b0;display:block;margin-bottom:6px">Change Admin PIN</label>
+        <div style="display:flex;gap:8px">
+          <input id="apiNewPin" type="password" maxlength="8" placeholder="New PIN (4-8 digits)"
+            style="flex:1;background:#081428;border:1px solid #1a3652;border-radius:6px;padding:7px 10px;color:#dde5f0;font-size:13px">
+          <button onclick="changeApiPin()" style="background:#1a3652;border:1px solid #1a6fd4;color:#1a6fd4;border-radius:6px;padding:7px 14px;font-size:12px;cursor:pointer">Set PIN</button>
+        </div>
+        <div id="apiPinChanged" style="color:#0db87a;font-size:12px;margin-top:6px;display:none">✓ PIN updated</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- User Management Modal -->
+<div id="userMgmtOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9200;display:none;align-items:center;justify-content:center">
+  <div style="background:#0d1f3c;border:1px solid #1a3652;border-radius:12px;padding:24px 28px;width:620px;max-width:95vw;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.7)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div style="font-size:16px;font-weight:700;color:#dde5f0">&#128101; User Management</div>
+      <button onclick="closeUserMgmt()" style="background:none;border:1px solid #1a3652;color:#7a90b0;border-radius:5px;padding:4px 12px;cursor:pointer;font-size:12px">Close</button>
+    </div>
+    <div style="overflow-y:auto;flex:1">
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="font-size:11px;color:#4a6080;border-bottom:1px solid #1a3652">
+            <th style="text-align:left;padding:6px 10px;font-weight:500">Username</th>
+            <th style="text-align:left;padding:6px 10px;font-weight:500">Display Name</th>
+            <th style="text-align:left;padding:6px 10px;font-weight:500">Role</th>
+            <th style="text-align:left;padding:6px 10px;font-weight:500">Last Login</th>
+            <th style="padding:6px 10px;font-weight:500">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="userListBody"></tbody>
+      </table>
+    </div>
+    <div style="margin-top:14px;border-top:1px solid #1a3652;padding-top:14px">
+      <button onclick="showAddUserForm()" style="background:#1a6fd4;border:none;color:#fff;border-radius:6px;padding:7px 18px;font-size:13px;cursor:pointer;font-weight:600">+ Add User</button>
+    </div>
+    <!-- Add user form -->
+    <div id="addUserForm" style="display:none;margin-top:14px;background:#081428;border:1px solid #1a3652;border-radius:8px;padding:16px">
+      <div style="font-size:13px;font-weight:600;color:#dde5f0;margin-bottom:12px">New User</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div><label style="font-size:11px;color:#7a90b0;display:block;margin-bottom:4px">Username</label>
+          <input id="newUsername" type="text" style="width:100%;background:#0d1f3c;border:1px solid #1a3652;border-radius:6px;padding:7px 10px;color:#dde5f0;font-size:13px;box-sizing:border-box"></div>
+        <div><label style="font-size:11px;color:#7a90b0;display:block;margin-bottom:4px">Display Name</label>
+          <input id="newDisplayName" type="text" style="width:100%;background:#0d1f3c;border:1px solid #1a3652;border-radius:6px;padding:7px 10px;color:#dde5f0;font-size:13px;box-sizing:border-box"></div>
+        <div><label style="font-size:11px;color:#7a90b0;display:block;margin-bottom:4px">Role</label>
+          <select id="newRole" style="width:100%;background:#0d1f3c;border:1px solid #1a3652;border-radius:6px;padding:7px 10px;color:#dde5f0;font-size:13px">
+            <option value="Viewer">Viewer</option>
+            <option value="Editor">Editor</option>
+            <option value="Admin">Admin</option>
+          </select></div>
+        <div><label style="font-size:11px;color:#7a90b0;display:block;margin-bottom:4px">Password</label>
+          <input id="newPassword" type="password" style="width:100%;background:#0d1f3c;border:1px solid #1a3652;border-radius:6px;padding:7px 10px;color:#dde5f0;font-size:13px;box-sizing:border-box"></div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button onclick="saveNewUser()" style="background:#0db87a;border:none;color:#fff;border-radius:6px;padding:7px 18px;font-size:13px;cursor:pointer;font-weight:600">Save User</button>
+        <button onclick="document.getElementById('addUserForm').style.display='none'" style="background:none;border:1px solid #1a3652;color:#7a90b0;border-radius:6px;padding:7px 14px;font-size:13px;cursor:pointer">Cancel</button>
+      </div>
+    </div>
   </div>
 </div>
 </body>
