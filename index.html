@@ -2115,6 +2115,12 @@ async function pingAPI(){
   }
 }
 
+// Fallback admin credentials (used when API is unreachable)
+var FALLBACK_USERS = [
+  {username:'admin', hash:'ac9689e2272427085e35b9d3e3e8bed88cb3434828b43b86fc0596cad4c6e270', role:'Admin', displayName:'Administrator'},
+  {username:'kiat',  hash:'006351717d82b3acbb4c55e4a5f499d7f1e93407f855879b60077e1265fab04a', role:'Admin', displayName:'Assoc.Prof. Kiattisak Hongku'}
+];
+
 async function doLogin(){
   var userEl = document.getElementById('loginUser');
   var passEl = document.getElementById('loginPass');
@@ -2128,31 +2134,53 @@ async function doLogin(){
   }
   if(errEl)errEl.style.display='none';
   if(spinEl)spinEl.style.display='block';
-  if(!APIURL){
+
+  var hash = await sha256(pass);
+
+  // Try API first if URL is available
+  if(APIURL){
+    try{
+      var url = APIURL+'?action=login&username='+encodeURIComponent(user)+'&passwordHash='+encodeURIComponent(hash)+'&t='+Date.now();
+      var r   = await fetch(url,{method:'GET',redirect:'follow',signal:AbortSignal.timeout(8000)});
+      var j   = await r.json();
+      if(spinEl)spinEl.style.display='none';
+      if(j.ok){
+        loginSuccess(j.username, j.role, j.displayName);
+        return;
+      } else if(j.error && j.error.indexOf('Unknown action')<0){
+        // Real auth failure (not a Code.gs version issue)
+        if(errEl){errEl.textContent='Invalid username or password';errEl.style.display='block';}
+        return;
+      }
+      // Falls through to fallback if "Unknown action: login" (old Code.gs)
+    }catch(e){
+      if(spinEl)spinEl.style.display='none';
+      // Network error — try fallback
+    }
+  } else {
     if(spinEl)spinEl.style.display='none';
-    if(errEl){errEl.textContent='No API URL set — use Change API URL below';errEl.style.display='block';}
+  }
+
+  // Fallback: check hardcoded credentials
+  var fb = FALLBACK_USERS.find(function(u){
+    return u.username.toLowerCase()===user.toLowerCase() && u.hash===hash;
+  });
+  if(fb){
+    loginSuccess(fb.username, fb.role, fb.displayName);
+    toast('Offline mode — using local credentials','ok');
     return;
   }
-  try{
-    var hash = await sha256(pass);
-    var url  = APIURL+'?action=login&username='+encodeURIComponent(user)+'&passwordHash='+encodeURIComponent(hash)+'&t='+Date.now();
-    var r    = await fetch(url,{method:'GET',redirect:'follow'});
-    var j    = await r.json();
-    if(spinEl)spinEl.style.display='none';
-    if(j.ok){
-      currentUser={username:j.username,role:j.role,displayName:j.displayName};
-      try{localStorage.setItem(SESSION_KEY,JSON.stringify(currentUser));}catch(e){}
-      showApp();
-      applyRoleUI();
-      loadData();
-      pingAPI();
-    } else {
-      if(errEl){errEl.textContent=j.error||'Invalid username or password';errEl.style.display='block';}
-    }
-  }catch(e){
-    if(spinEl)spinEl.style.display='none';
-    if(errEl){errEl.textContent='Connection failed: '+e.message;errEl.style.display='block';}
-  }
+
+  if(errEl){errEl.textContent='Invalid username or password';errEl.style.display='block';}
+}
+
+function loginSuccess(username, role, displayName){
+  currentUser={username:username,role:role,displayName:displayName};
+  try{localStorage.setItem(SESSION_KEY,JSON.stringify(currentUser));}catch(e){}
+  showApp();
+  applyRoleUI();
+  loadData();
+  pingAPI();
 }
 
 function tryRestoreSession(){
