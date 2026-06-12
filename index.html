@@ -201,22 +201,7 @@ input:focus,select:focus{border-color:#08c8d0}
     <button class="login-btn" onclick="doLogin()">Sign In</button>
     <div class="login-err" id="loginErr">Invalid username or password</div>
     <div id="loginSpinner" style="text-align:center;color:#7a90b0;font-size:12px;margin-top:10px;display:none">⧗ Authenticating…</div>
-    <div style="margin-top:20px;border-top:1px solid #1a3652;padding-top:14px">
-      <details>
-        <summary style="font-size:11px;color:#4a6080;cursor:pointer;list-style:none;padding:6px 0;text-align:center">⚙️ Change API URL (no login required)</summary>
-        <div style="margin-top:10px">
-          <div style="font-size:11px;color:#7a90b0;margin-bottom:6px">Paste new Google Apps Script URL:</div>
-          <input id="emergencyApiInp" type="text" placeholder="https://script.google.com/macros/s/.../exec"
-            style="width:100%;background:#081428;border:1px solid #1a6fd4;border-radius:6px;padding:8px 10px;color:#dde5f0;font-size:12px;box-sizing:border-box;margin-bottom:8px">
-          <button onclick="(function(){
-  var u=document.getElementById('emergencyApiInp').value.trim();
-  if(!u||u.indexOf('script.google.com/macros')<0){alert('Invalid URL');return;}
-  try{localStorage.setItem('ev5',u);APIURL=u;alert('Saved! Now try logging in:\nUsername: admin\nPassword: admin1234');}
-  catch(e){alert('Error: '+e.message);}
-})()" style="width:100%;background:#1a6fd4;border:none;color:#fff;border-radius:6px;padding:7px;font-size:12px;cursor:pointer;font-weight:600">Save URL</button>
-        </div>
-      </details>
-    </div>
+
   </div>
 </div>
 <div id="setup">
@@ -2256,20 +2241,58 @@ function renderUserList(){
   var tb=document.getElementById('userListBody');
   if(!tb)return;
   tb.innerHTML=_allUsers.map(function(u){
-    return '<tr>'
-      +'<td style="padding:8px 10px;font-size:13px;color:#dde5f0">'+esc(u.username)+'</td>'
-      +'<td style="padding:8px 10px;font-size:13px">'+esc(u.displayName)+'</td>'
+    var isSelf=u.username===currentUser.username;
+    return '<tr style="border-bottom:1px solid #0d1f3c">'
+      +'<td style="padding:8px 10px;font-size:13px;color:#dde5f0;font-weight:600">'+esc(u.username)
+      +(isSelf?'<span style="font-size:10px;color:#08c8d0;margin-left:6px">(you)</span>':'')+'</td>'
+      +'<td style="padding:8px 10px;font-size:13px;color:#dde5f0">'+esc(u.displayName)+'</td>'
       +'<td style="padding:8px 10px"><span class="login-badge role-'+u.role.toLowerCase()+'">'+u.role+'</span></td>'
-      +'<td style="padding:8px 10px;font-size:11px;color:#4a6080">'+(u.lastLogin?u.lastLogin.substring(0,10):'Never')+'</td>'
-      +'<td style="padding:8px 10px;white-space:nowrap">'
-      +'<button onclick="editUser(\''+esc(u.username)+'\')" style="background:#0d1f3c;border:1px solid #1a6fd4;color:#1a6fd4;border-radius:5px;padding:3px 10px;font-size:11px;cursor:pointer;margin-right:4px">Edit</button>'
-      +(u.username!==currentUser.username
-        ?'<button onclick="deleteUser(\''+esc(u.username)+'\')" style="background:#0d1f3c;border:1px solid #e03030;color:#e03030;border-radius:5px;padding:3px 10px;font-size:11px;cursor:pointer">Del</button>'
-        :'')
-      +'</td>'
+      +'<td style="padding:8px 10px;font-size:11px;color:#4a6080">'+(u.lastLogin&&u.lastLogin.length>9?u.lastLogin.substring(0,10):'Never')+'</td>'
+      +'<td style="padding:8px 10px">'
+      +'<div style="display:flex;gap:4px;flex-wrap:wrap">'
+      +'<button onclick="editUserRole(\''+esc(u.username)+'\')" style="background:#0d1f3c;border:1px solid #1a6fd4;color:#1a6fd4;border-radius:5px;padding:3px 9px;font-size:11px;cursor:pointer">Role</button>'
+      +'<button onclick="resetUserPassword(\''+esc(u.username)+'\')" style="background:#0d1f3c;border:1px solid #f09030;color:#f09030;border-radius:5px;padding:3px 9px;font-size:11px;cursor:pointer">\ud83d\udd11 Reset PW</button>'
+      +(!isSelf?'<button onclick="deleteUser(\''+esc(u.username)+'\')" style="background:#0d1f3c;border:1px solid #e03030;color:#e03030;border-radius:5px;padding:3px 9px;font-size:11px;cursor:pointer">Del</button>':'')
+      +'</div></td>'
       +'</tr>';
   }).join('');
 }
+
+async function editUserRole(username){
+  var u=_allUsers.find(function(x){return x.username===username;});
+  if(!u)return;
+  var newRole=prompt('Change role for "'+username+'"\n\nOptions: Admin / Editor / Viewer\nCurrent role: '+u.role, u.role);
+  if(!newRole||newRole.trim()===u.role)return;
+  newRole=newRole.trim();
+  if(['Admin','Editor','Viewer'].indexOf(newRole)<0){alert('Invalid role.\nPlease use: Admin, Editor, or Viewer');return;}
+  await sendUserUpdate({username:username, role:newRole, displayName:u.displayName});
+}
+
+async function resetUserPassword(username){
+  var newPass=prompt('Set new password for "'+username+'":\n(min 6 characters)');
+  if(!newPass)return;
+  if(newPass.length<6){alert('Password must be at least 6 characters');return;}
+  var confirm2=prompt('Confirm new password:');
+  if(newPass!==confirm2){alert('Passwords do not match');return;}
+  var hash=await sha256(newPass);
+  var result=await sendUserUpdate({username:username, passwordHash:hash});
+  if(result){
+    alert('\u2705 Password reset for "'+username+'"\n\nNew password: '+newPass+'\n\nPlease inform the user.');
+  }
+}
+
+async function sendUserUpdate(data){
+  try{
+    var fd=new FormData();
+    fd.append('action','upsertUser');
+    fd.append('data',JSON.stringify(data));
+    var r=await fetch(APIURL,{method:'POST',body:fd,redirect:'follow'});
+    var j=await r.json();
+    if(j.saved){toast('\u2705 User '+j.saved+' updated','ok');await refreshUserList();return true;}
+    else{alert('Error: '+(j.error||'Unknown error'));return false;}
+  }catch(e){alert('Failed: '+e.message);return false;}
+}
+
 
 function showAddUserForm(){
   document.getElementById('addUserForm').style.display='block';
@@ -2299,24 +2322,36 @@ async function saveNewUser(){
 }
 
 function editUser(username){
-  var u=_allUsers.find(function(x){return x.username===username;});
+  var u = _allUsers.find(function(x){return x.username===username;});
   if(!u)return;
-  var newPass=prompt('New password for '+username+' (leave blank to keep current):');
-  var newRole=prompt('Role (Admin/Editor/Viewer) — current: '+u.role+':',u.role);
-  if(!newRole||!['Admin','Editor','Viewer'].includes(newRole)){alert('Invalid role');return;}
-  sha256(newPass||'').then(function(hash){
-    var data={username:username,role:newRole,displayName:u.displayName};
-    if(newPass)data.passwordHash=hash;
-    var fd=new FormData();
+  var newRole = prompt('Role for '+username+'\nOptions: Admin / Editor / Viewer\nCurrent: '+u.role, u.role);
+  if(!newRole)return;
+  newRole = newRole.trim();
+  if(['Admin','Editor','Viewer'].indexOf(newRole) < 0){ alert('Invalid role. Use: Admin, Editor, or Viewer'); return; }
+  var changePass = confirm('Change password for '+username+'?\n(Click OK to set new password, Cancel to keep current)');
+  var data = {username: username, role: newRole, displayName: u.displayName};
+  if(changePass){
+    var newPass = prompt('New password for '+username+' (min 6 chars):');
+    if(!newPass||newPass.length<6){ alert('Password too short — role was not changed either'); return; }
+    sha256(newPass).then(function(hash){
+      data.passwordHash = hash;
+      sendUserUpdate(data);
+    });
+  } else {
+    sendUserUpdate(data);
+  }
+}
+
+async function sendUserUpdate(data){
+  try{
+    var fd = new FormData();
     fd.append('action','upsertUser');
-    fd.append('data',JSON.stringify(data));
-    fetch(APIURL,{method:'POST',body:fd,redirect:'follow'})
-      .then(function(r){return r.json();})
-      .then(function(j){
-        if(j.saved){toast('Updated '+j.saved,'ok');refreshUserList();}
-        else toast('Error: '+(j.error||''),'err');
-      });
-  });
+    fd.append('data', JSON.stringify(data));
+    var r = await fetch(APIURL, {method:'POST', body:fd, redirect:'follow'});
+    var j = await r.json();
+    if(j.saved){ toast('\u2705 User '+j.saved+' updated','ok'); refreshUserList(); }
+    else { alert('Error: '+(j.error||'unknown')); }
+  }catch(e){ alert('Failed: '+e.message); }
 }
 
 async function deleteUser(username){
@@ -2331,26 +2366,48 @@ async function deleteUser(username){
 }
 
 async function changeOwnPassword(){
-  var oldP=prompt('Current password:');
-  if(!oldP)return;
-  var newP=prompt('New password (min 6 chars):');
-  if(!newP||newP.length<6){alert('Password too short');return;}
-  var newP2=prompt('Confirm new password:');
-  if(newP!==newP2){alert('Passwords do not match');return;}
-  // Verify old password
-  var oldHash=await sha256(oldP);
-  var url=APIURL+'?action=login&username='+encodeURIComponent(currentUser.username)+'&passwordHash='+encodeURIComponent(oldHash)+'&t='+Date.now();
-  var r=await fetch(url,{redirect:'follow'});
-  var j=await r.json();
-  if(!j.ok){alert('Current password incorrect');return;}
-  var newHash=await sha256(newP);
-  var fd=new FormData();
-  fd.append('action','upsertUser');
-  fd.append('data',JSON.stringify({username:currentUser.username,passwordHash:newHash}));
-  var r2=await fetch(APIURL,{method:'POST',body:fd,redirect:'follow'});
-  var j2=await r2.json();
-  if(j2.saved)toast('Password changed successfully','ok');
-  else toast('Failed: '+(j2.error||''),'err');
+  // Show a proper modal instead of prompts
+  var oldP = prompt('Enter your CURRENT password:');
+  if(oldP === null) return;
+  var newP = prompt('Enter NEW password (min 6 characters):');
+  if(newP === null) return;
+  if(newP.length < 6){ alert('Password must be at least 6 characters'); return; }
+  var newP2 = prompt('Confirm new password:');
+  if(newP2 === null) return;
+  if(newP !== newP2){ alert('Passwords do not match'); return; }
+
+  try{
+    // Step 1: verify current password
+    var oldHash = await sha256(oldP);
+    var verifyUrl = APIURL+'?action=login&username='+encodeURIComponent(currentUser.username)
+      +'&passwordHash='+encodeURIComponent(oldHash)+'&t='+Date.now();
+    var r1 = await fetch(verifyUrl, {method:'GET', redirect:'follow'});
+    var j1 = await r1.json();
+    if(!j1.ok){
+      alert('Current password is incorrect. Please try again.');
+      return;
+    }
+
+    // Step 2: update with new password hash
+    var newHash = await sha256(newP);
+    var fd = new FormData();
+    fd.append('action', 'upsertUser');
+    fd.append('data', JSON.stringify({
+      username: currentUser.username,
+      passwordHash: newHash
+    }));
+    var r2 = await fetch(APIURL, {method:'POST', body:fd, redirect:'follow'});
+    var j2 = await r2.json();
+
+    if(j2.saved){
+      toast('\u2705 Password changed successfully. Please use new password next login.', 'ok');
+      // Update session so they don't get logged out
+    } else {
+      alert('Failed to update password: ' + (j2.error || 'Unknown error'));
+    }
+  } catch(e) {
+    alert('Error: ' + e.message);
+  }
 }
 
 function buildTabs(p){
