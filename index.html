@@ -1406,6 +1406,7 @@ function lsLoad(){
         if(typeof p.mfi5Items==='string'){try{p.mfi5Items=JSON.parse(p.mfi5Items);}catch(e){p.mfi5Items={};}}
         if(typeof p.frailItems==='string'){try{p.frailItems=JSON.parse(p.frailItems);}catch(e){p.frailItems={};}}
         if(typeof p.adjunctAortic==='string'){try{p.adjunctAortic=JSON.parse(p.adjunctAortic);}catch(e){p.adjunctAortic={};}}
+        if(typeof p.deviceInventory==='string'){try{p.deviceInventory=JSON.parse(p.deviceInventory);}catch(e){p.deviceInventory={};}}
         return p;
       });
       return true;
@@ -2438,6 +2439,159 @@ async function changeOwnPassword(){
   }
 }
 
+
+// ── OPERATIVE DEVICE INVENTORY ────────────────────────────────────────────────
+var DEVICE_GROUPS = [
+  'Access/Sheath',
+  'Guidewire (GW)',
+  'Coils',
+  'Vascular Plug',
+  'Catheter',
+  'Balloon',
+  'Stent',
+  'Others'
+];
+var DEV_INV_KEY = 'cEVAR_deviceInventory_v1'; // localStorage for known devices
+var _devInventory = null; // {sapNumber: deviceName}
+
+function getDevInventory(){
+  if(_devInventory) return _devInventory;
+  try{
+    var s = localStorage.getItem(DEV_INV_KEY);
+    _devInventory = s ? JSON.parse(s) : {};
+  }catch(e){ _devInventory = {}; }
+  return _devInventory;
+}
+function saveDevInventory(){
+  try{ localStorage.setItem(DEV_INV_KEY, JSON.stringify(_devInventory)); }catch(e){}
+}
+function learnDevice(sapNum, name){
+  if(!sapNum||!name) return;
+  var inv = getDevInventory();
+  inv[sapNum.trim()] = name.trim();
+  _devInventory = inv;
+  saveDevInventory();
+}
+function lookupDevice(sapNum){
+  if(!sapNum) return '';
+  return getDevInventory()[sapNum.trim()] || '';
+}
+
+function deviceInventorySection(pv){
+  var items = pv.deviceInventory || {};
+  var html = '<div style="display:flex;flex-direction:column;gap:14px">';
+  DEVICE_GROUPS.forEach(function(grp){
+    var grpItems = items[grp] || [{}];
+    var grpId    = grp.replace(/[^a-z0-9]/gi,'_');
+    html += '<div class="dev-grp" id="devgrp-'+grpId+'" style="background:#081428;border:1px solid #1a3652;border-radius:8px;padding:14px 16px">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
+      + '<div style="font-size:13px;font-weight:700;color:#08c8d0">'+grp+'</div>'
+      + '<button type="button" onclick="addDevRow(\''+grpId+'\')" '
+      + 'style="background:#0d2040;border:1px solid #1a6fd4;color:#1a6fd4;border-radius:5px;padding:3px 12px;font-size:12px;cursor:pointer">+ Add</button>'
+      + '</div>'
+      + '<div id="devrows-'+grpId+'">';
+    grpItems.forEach(function(item, idx){
+      html += devRowHtml(grpId, idx, item);
+    });
+    html += '</div></div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+function devRowHtml(grpId, idx, item){
+  var name   = item.name   || '';
+  var sapNum = item.sapNum || '';
+  var qty    = item.qty    || '1';
+  return '<div id="devrow-'+grpId+'-'+idx+'" style="display:grid;grid-template-columns:2fr 140px 60px 32px;gap:8px;align-items:center;margin-bottom:8px">'
+    // Device name with dropdown from known items
+    + '<div style="position:relative">'
+    + '<input id="devname-'+grpId+'-'+idx+'" type="text" value="'+esc(name)+'" placeholder="Device name" list="devlist-'+grpId+'-'+idx+'"'
+    + ' onchange="onDevNameChange(\''+grpId+'\','+idx+')"'
+    + ' style="width:100%;background:#0d1f3c;border:1px solid #1a3652;border-radius:6px;padding:6px 10px;color:#dde5f0;font-size:12px;box-sizing:border-box">'
+    + '<datalist id="devlist-'+grpId+'-'+idx+'">'
+    + Object.values(getDevInventory()).map(function(n){return'<option value="'+esc(n)+'">'+esc(n)+'</option>';}).join('')
+    + '</datalist>'
+    + '</div>'
+    // SAP number — scan barcode here
+    + '<input id="devsap-'+grpId+'-'+idx+'" type="text" value="'+esc(sapNum)+'" placeholder="SAP / Barcode"'
+    + ' oninput="onSapInput(\''+grpId+'\','+idx+')"'
+    + ' style="background:#0d1f3c;border:1px solid #1a3652;border-radius:6px;padding:6px 10px;color:#7a90b0;font-size:12px;font-family:monospace">'
+    // Quantity
+    + '<input id="devqty-'+grpId+'-'+idx+'" type="number" min="1" value="'+esc(qty)+'" placeholder="Qty"'
+    + ' style="background:#0d1f3c;border:1px solid #1a3652;border-radius:6px;padding:6px 8px;color:#dde5f0;font-size:12px;text-align:center">'
+    // Remove button
+    + '<button type="button" onclick="removeDevRow(\''+grpId+'\','+idx+')"'
+    + ' style="background:#1a0d0d;border:1px solid #5a2020;color:#e03030;border-radius:5px;width:28px;height:28px;cursor:pointer;font-size:14px;line-height:1">&times;</button>'
+    + '</div>';
+}
+
+function addDevRow(grpId){
+  var container = document.getElementById('devrows-'+grpId);
+  if(!container) return;
+  var existing  = container.querySelectorAll('[id^="devrow-'+grpId+'"]');
+  var newIdx    = existing.length;
+  var div = document.createElement('div');
+  div.innerHTML = devRowHtml(grpId, newIdx, {});
+  container.appendChild(div.firstElementChild);
+  // Focus new name field
+  var inp = document.getElementById('devname-'+grpId+'-'+newIdx);
+  if(inp) inp.focus();
+}
+
+function removeDevRow(grpId, idx){
+  var row = document.getElementById('devrow-'+grpId+'-'+idx);
+  if(row) row.remove();
+}
+
+function onSapInput(grpId, idx){
+  var sapEl  = document.getElementById('devsap-'+grpId+'-'+idx);
+  var nameEl = document.getElementById('devname-'+grpId+'-'+idx);
+  if(!sapEl||!nameEl) return;
+  var sap = sapEl.value.trim();
+  // Auto-fill name from known inventory
+  var known = lookupDevice(sap);
+  if(known && !nameEl.value){
+    nameEl.value = known;
+  }
+}
+
+function onDevNameChange(grpId, idx){
+  var sapEl  = document.getElementById('devsap-'+grpId+'-'+idx);
+  var nameEl = document.getElementById('devname-'+grpId+'-'+idx);
+  if(!sapEl||!nameEl) return;
+  // Learn new SAP-name pair
+  if(sapEl.value && nameEl.value){
+    learnDevice(sapEl.value, nameEl.value);
+  }
+}
+
+function collectDeviceInventory(){
+  var result = {};
+  DEVICE_GROUPS.forEach(function(grp){
+    var grpId = grp.replace(/[^a-z0-9]/gi,'_');
+    var container = document.getElementById('devrows-'+grpId);
+    if(!container) return;
+    var rows = container.querySelectorAll('[id^="devrow-'+grpId+'"]');
+    var items = [];
+    rows.forEach(function(row){
+      // Get index from id
+      var parts = row.id.split('-');
+      var idx   = parts[parts.length-1];
+      var name  = (document.getElementById('devname-'+grpId+'-'+idx)||{value:''}).value.trim();
+      var sap   = (document.getElementById('devsap-'+grpId+'-'+idx)||{value:''}).value.trim();
+      var qty   = (document.getElementById('devqty-'+grpId+'-'+idx)||{value:'1'}).value.trim();
+      if(name || sap){
+        items.push({name:name, sapNum:sap, qty:qty});
+        // Learn for future
+        if(sap && name) learnDevice(sap, name);
+      }
+    });
+    if(items.length) result[grp] = items;
+  });
+  return {deviceInventory: result};
+}
+
 function buildTabs(p){
   var pv=p||{};
   // Zone diagram HTML
@@ -2552,8 +2706,8 @@ fld('ASA Class',sel('f-asa',OPTS.asa,pv.asa))])
     +sh('Target Vessel Incorporation Count - SVS 2020')
     +gr(5,[fld('Celiac Artery',sel('f-celiac',OPTS.yno,pv.celiac)),fld('SMA',sel('f-sma',OPTS.yno,pv.sma)),fld('Left Renal',sel('f-lRenal',OPTS.yno,pv.lRenal)),fld('Right Renal',sel('f-rRenal',OPTS.yno,pv.rRenal)),fld('L Subclavian / LSA',sel('f-lSubcl',OPTS.yno,pv.lSubcl))])
     
-    +sh('Additional Equipment')
-    +gr(3,[fld('Sheath',inp('f-sheath','text',pv.sheath||'')),fld('Guidewire',inp('f-guidewire','text',pv.guidewire||'')),fld('Catheter',inp('f-catheter','text',pv.catheter||''))])
+    +sh('Operative Equipment & Devices')
+    +deviceInventorySection(pv)
     +zoneTab,
     // Tab 3: Outcomes
     sh('Technical Outcomes - SVS 2020')
@@ -2684,6 +2838,7 @@ async function loadData(){
         if(typeof p.mfi5Items==='string'){try{p.mfi5Items=JSON.parse(p.mfi5Items);}catch(e){p.mfi5Items={};}}
         if(typeof p.frailItems==='string'){try{p.frailItems=JSON.parse(p.frailItems);}catch(e){p.frailItems={};}}
         if(typeof p.adjunctAortic==='string'){try{p.adjunctAortic=JSON.parse(p.adjunctAortic);}catch(e){p.adjunctAortic={};}}
+        if(typeof p.deviceInventory==='string'){try{p.deviceInventory=JSON.parse(p.deviceInventory);}catch(e){p.deviceInventory={};}}
         return p;
       });
       lsSave();
@@ -2904,12 +3059,14 @@ async function saveForm(){
   var tvs=collectTVAll();
   var fri=collectFrailtyItems();
   var adjA=collectAdjunctAortic();
+  var devInv=collectDeviceInventory();
   calcFrailty();
   // Flatten JSON blob fields for Google Sheets storage
   if(fri.mfi5Items&&typeof fri.mfi5Items==='object')fri.mfi5Items=JSON.stringify(fri.mfi5Items);
   if(fri.frailItems&&typeof fri.frailItems==='object')fri.frailItems=JSON.stringify(fri.frailItems);
   if(adjA.adjunctAortic&&typeof adjA.adjunctAortic==='object')adjA.adjunctAorticJson=JSON.stringify(adjA.adjunctAortic);
-  var pt=Object.assign({id:id,dateRegistry:gv('f-dateRegistry'),dateCTA:gv('f-dateCTA'),datePreop:gv('f-datePreop'),patientStatus:gv('f-patientStatus'),graftPlanSign:gv('f-graftPlanSign'),graftShipDate:gv('f-graftShipDate'),procedureDate:gv('f-procedureDate'),actualProcedureDate:gv('f-actualProcedureDate'),hn:gv('f-hn'),age:gv('f-age'),sex:gv('f-sex'),weight:gv('f-weight'),height:gv('f-height'),bmi:gv('f-bmi'),bsa:gv('f-bsa'),asa:gv('f-asa'),htn:gv('f-htn'),dm:gv('f-dm'),dyslipaemia:gv('f-dyslipaemia'),smoking:gv('f-smoking'),packYears:gv('f-packYears'),cad:gv('f-cad'),copd:gv('f-copd'),ckd:gv('f-ckd'),creatinine:gv('f-creatinine'),egfr:gv('f-egfr'),pvd:gv('f-pvd'),cvd:gv('f-cvd'),frailtyTool:gv('f-frailtyTool'),frailtyScore:gv('f-frailtyScore'),frailtyGrade:gv('f-frailtyGrade'),presentation:gv('f-presentation'),diagnosis:gv('f-diagnosis'),extent:gv('f-extent'),maxDiam:gv('f-maxDiam'),proxNeck:gv('f-proxNeck'),neckAngle:gv('f-neckAngle'),neckCalc:gv('f-neckCalc'),ifu:gv('f-ifu'),sdm:gv('f-sdm'),procType:gv('f-procType'),deviceStrategy:gv('f-deviceStrategy'),brand:gv('f-brand'),model:gv('f-model'),proxDiam:gv('f-proxDiam'),proxSeal:gv('f-proxSeal'),fenestrations:gv('f-fenestrations'),branches:gv('f-branches'),celiac:gv('f-celiac'),sma:gv('f-sma'),lRenal:gv('f-lRenal'),rRenal:gv('f-rRenal'),lSubcl:gv('f-lSubcl'),ana:gv('f-ana'),csfDrain:gv('f-csfDrain'),spinal:gv('f-spinal'),mapTarget:gv('f-mapTarget'),staged:gv('f-staged'),plannedStrategy:gv('f-plannedStrategy'),cmdManufacturer:gv('f-cmdManufacturer'),pmegManufacturer:gv('f-pmegManufacturer'),otsManufacturer:gv('f-otsManufacturer'),operator:gv('f-operator'),assistant:gv('f-assistant'),anesthesiologist:gv('f-anesthesiologist'),timeAnesStart:gv('f-timeAnesStart'),timeOpStart:gv('f-timeOpStart'),timeOpEnd:gv('f-timeOpEnd'),timeAnesEnd:gv('f-timeAnesEnd'),airKerma:gv('f-airKerma'),dap:gv('f-dap'),contrastName:gv('f-contrastName'),co2angio:gvChk('f-co2angio'),cbct:gvChk('f-cbct'),sheath:gv('f-sheath'),guidewire:gv('f-guidewire'),catheter:gv('f-catheter'),orTime:gv('f-orTime'),fluoro:gv('f-fluoro'),contrast:gv('f-contrast'),ebl:gv('f-ebl'),ptSuccess:gv('f-ptSuccess'),tvSuccess:gv('f-tvSuccess'),intraopEL:gv('f-intraopEL'),sci:gv('f-sci'),sciGrade:gv('f-sciGrade'),sciPerm:gv('f-sciPerm'),sciOnset:gv('f-sciOnset'),stroke:gv('f-stroke'),aki:gv('f-aki'),akiStage:gv('f-akiStage'),rrt:gv('f-rrt'),bowel:gv('f-bowel'),mi:gv('f-mi'),icu:gv('f-icu'),hospital:gv('f-hospital'),mort30d:gv('f-mort30d'),cause30d:gv('f-cause30d'),mae:gv('f-mae'),celiacP:gv('f-celiacP'),smaP:gv('f-smaP'),lRenalP:gv('f-lRenalP'),rRenalP:gv('f-rRenalP'),tvi:gv('f-tvi'),tviType:gv('f-tviType'),proxZone:gv('f-proxZone'),distZoneL:gv('f-distZoneL'),distZoneR:gv('f-distZoneR'),zoneExtent:gv('f-zoneExtent'),followups:collectFUs()},access,device,tvs,fri,adjA);
+  if(devInv.deviceInventory&&typeof devInv.deviceInventory==='object')devInv.deviceInventory=JSON.stringify(devInv.deviceInventory);
+  var pt=Object.assign({id:id,dateRegistry:gv('f-dateRegistry'),dateCTA:gv('f-dateCTA'),datePreop:gv('f-datePreop'),patientStatus:gv('f-patientStatus'),graftPlanSign:gv('f-graftPlanSign'),graftShipDate:gv('f-graftShipDate'),procedureDate:gv('f-procedureDate'),actualProcedureDate:gv('f-actualProcedureDate'),hn:gv('f-hn'),age:gv('f-age'),sex:gv('f-sex'),weight:gv('f-weight'),height:gv('f-height'),bmi:gv('f-bmi'),bsa:gv('f-bsa'),asa:gv('f-asa'),htn:gv('f-htn'),dm:gv('f-dm'),dyslipaemia:gv('f-dyslipaemia'),smoking:gv('f-smoking'),packYears:gv('f-packYears'),cad:gv('f-cad'),copd:gv('f-copd'),ckd:gv('f-ckd'),creatinine:gv('f-creatinine'),egfr:gv('f-egfr'),pvd:gv('f-pvd'),cvd:gv('f-cvd'),frailtyTool:gv('f-frailtyTool'),frailtyScore:gv('f-frailtyScore'),frailtyGrade:gv('f-frailtyGrade'),presentation:gv('f-presentation'),diagnosis:gv('f-diagnosis'),extent:gv('f-extent'),maxDiam:gv('f-maxDiam'),proxNeck:gv('f-proxNeck'),neckAngle:gv('f-neckAngle'),neckCalc:gv('f-neckCalc'),ifu:gv('f-ifu'),sdm:gv('f-sdm'),procType:gv('f-procType'),deviceStrategy:gv('f-deviceStrategy'),brand:gv('f-brand'),model:gv('f-model'),proxDiam:gv('f-proxDiam'),proxSeal:gv('f-proxSeal'),fenestrations:gv('f-fenestrations'),branches:gv('f-branches'),celiac:gv('f-celiac'),sma:gv('f-sma'),lRenal:gv('f-lRenal'),rRenal:gv('f-rRenal'),lSubcl:gv('f-lSubcl'),ana:gv('f-ana'),csfDrain:gv('f-csfDrain'),spinal:gv('f-spinal'),mapTarget:gv('f-mapTarget'),staged:gv('f-staged'),plannedStrategy:gv('f-plannedStrategy'),cmdManufacturer:gv('f-cmdManufacturer'),pmegManufacturer:gv('f-pmegManufacturer'),otsManufacturer:gv('f-otsManufacturer'),operator:gv('f-operator'),assistant:gv('f-assistant'),anesthesiologist:gv('f-anesthesiologist'),timeAnesStart:gv('f-timeAnesStart'),timeOpStart:gv('f-timeOpStart'),timeOpEnd:gv('f-timeOpEnd'),timeAnesEnd:gv('f-timeAnesEnd'),airKerma:gv('f-airKerma'),dap:gv('f-dap'),contrastName:gv('f-contrastName'),co2angio:gvChk('f-co2angio'),cbct:gvChk('f-cbct'),sheath:gv('f-sheath'),guidewire:gv('f-guidewire'),catheter:gv('f-catheter'),orTime:gv('f-orTime'),fluoro:gv('f-fluoro'),contrast:gv('f-contrast'),ebl:gv('f-ebl'),ptSuccess:gv('f-ptSuccess'),tvSuccess:gv('f-tvSuccess'),intraopEL:gv('f-intraopEL'),sci:gv('f-sci'),sciGrade:gv('f-sciGrade'),sciPerm:gv('f-sciPerm'),sciOnset:gv('f-sciOnset'),stroke:gv('f-stroke'),aki:gv('f-aki'),akiStage:gv('f-akiStage'),rrt:gv('f-rrt'),bowel:gv('f-bowel'),mi:gv('f-mi'),icu:gv('f-icu'),hospital:gv('f-hospital'),mort30d:gv('f-mort30d'),cause30d:gv('f-cause30d'),mae:gv('f-mae'),celiacP:gv('f-celiacP'),smaP:gv('f-smaP'),lRenalP:gv('f-lRenalP'),rRenalP:gv('f-rRenalP'),tvi:gv('f-tvi'),tviType:gv('f-tviType'),proxZone:gv('f-proxZone'),distZoneL:gv('f-distZoneL'),distZoneR:gv('f-distZoneR'),zoneExtent:gv('f-zoneExtent'),followups:collectFUs()},access,device,tvs,fri,adjA,devInv);
   var btn=document.getElementById('saveBtn');
   btn.disabled=true;btn.textContent='Saving...';
   try{
