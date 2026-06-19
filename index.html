@@ -520,8 +520,17 @@ function renderZoneCanvas(){
   ctx.restore();
   if(ZS.prox===null)return;
 
-  // Effective distal = ZS.dist, ignoring iliac L/R (drawn separately)
+  // Effective distal for zones 0-9 coverage: account for iliac L/R selections too,
+  // so the gap zones between proximal and the iliac split (e.g. zone 9) are filled in.
+  var iliacNums=[];
+  if(ZS_DIST_L)iliacNums.push(zoneNumeric(ZS_DIST_L));
+  if(ZS_DIST_R)iliacNums.push(zoneNumeric(ZS_DIST_R));
   var hi=ZS.dist!==null?ZS.dist:ZS.prox;
+  if(iliacNums.length){
+    // Coverage of zones 0-9 should extend up to zone 9 (infrarenal aorta)
+    // whenever an iliac zone is selected, since 10/11 sit distal to zone 9.
+    hi=Math.max(hi,9);
+  }
   var lo=ZS.prox;
 
   // Draw coverage zones 0-9 (not iliac)
