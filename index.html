@@ -849,8 +849,8 @@ var CKD_STAGES = [
 function selCkd(id,val){
   // Read-only display — stage is auto-derived from eGFR, not manually picked.
   // The hidden input keeps the actual value for saveForm's gv('f-ckd') to read.
-  return '<div id="ckdBadgeWrap" style="display:flex;align-items:center;gap:8px;min-height:36px">'
-    +'<span id="ckdBadge" style="font-size:13px;font-weight:700;padding:5px 12px;border-radius:6px;background:#0d1f3c;border:1px solid #1a3652;color:#7a90b0">'
+  return '<div id="ckdBadgeWrap" style="display:flex;align-items:center;min-height:36px;width:100%">'
+    +'<span id="ckdBadge" style="font-size:13px;font-weight:700;padding:7px 12px;border-radius:6px;background:#0d1f3c;border:1px solid #1a3652;color:#7a90b0;width:100%;box-sizing:border-box;white-space:normal;line-height:1.3;display:block">'
     +(val?esc(ckdStageLabel(val)):'Enter creatinine, age, sex \u2192')
     +'</span>'
     +'<input type="hidden" id="'+id+'" value="'+esc(val||'')+'">'
@@ -870,10 +870,10 @@ function ckdStageColor(v){
   return {bg:'#0d1f3c',bd:'#1a3652',fg:'#7a90b0'};
 }
 
-// ── eGFR CALCULATOR \u2014 CKD-EPI Creatinine Equation (2021), race-free ───────────
+// ── eGFR CALCULATOR — CKD-EPI Creatinine Equation (2021), race-free ───────────
 // Reference: National Kidney Foundation / Inker LA et al., NEJM 2021
-// eGFR = 142 \u00d7 min(Scr/\u03ba,1)^\u03b1 \u00d7 max(Scr/\u03ba,1)^-1.200 \u00d7 0.9938^Age \u00d7 1.012 [if female]
-// Scr in mg/dL. Registry stores creatinine in \u00b5mol/L \u2014 convert: mg/dL = \u00b5mol/L / 88.4
+// eGFR = 142 × min(Scr/κ,1)^α × max(Scr/κ,1)^-1.200 × 0.9938^Age × 1.012 [if female]
+// Scr (serum creatinine) is entered directly in mg/dL — the native unit of this equation.
 function calcEGFR(){
   var crEl  = document.getElementById('f-creatinine');
   var ageEl = document.getElementById('f-age');
@@ -884,11 +884,11 @@ function calcEGFR(){
   var hintEl= document.getElementById('egfrCalcHint');
   if(!crEl||!ageEl||!sexEl||!egfrEl) return;
 
-  var crUmol = parseFloat(crEl.value);
-  var age    = parseFloat(ageEl.value);
-  var sex    = sexEl.value;
+  var scr = parseFloat(crEl.value); // mg/dL, entered directly
+  var age = parseFloat(ageEl.value);
+  var sex = sexEl.value;
 
-  if(!crUmol || !age || !sex || (sex!=='Male' && sex!=='Female')){
+  if(!scr || scr<=0 || !age || age<=0 || (sex!=='M' && sex!=='F')){
     if(hintEl) hintEl.textContent = '';
     if(badge){
       badge.textContent = 'Enter creatinine, age, sex \u2192';
@@ -900,8 +900,7 @@ function calcEGFR(){
     return;
   }
 
-  var scr = crUmol / 88.4; // mg/dL
-  var isFemale = sex==='Female';
+  var isFemale = sex==='F';
   var kappa = isFemale ? 0.7 : 0.9;
   var alpha = isFemale ? -0.241 : -0.302;
   var minRatio = Math.min(scr/kappa, 1);
@@ -2778,7 +2777,7 @@ function buildTabs(p){
     sh('📋 Registry Status')
     +gr(4,[fld('Date of Registry *',inp('f-dateRegistry','date',pv.dateRegistry||'')),fld('Date of CTA',inp('f-dateCTA','date',pv.dateCTA||'')),fld('Date of Complete Preop Evaluation',inp('f-datePreop','date',pv.datePreop||'')),fld('Patient Status *',sel('f-patientStatus',['','OR Scheduled','Awaiting OR Scheduled','Awaiting Preoperative Evaluation'],pv.patientStatus||''))])     +gr(2,[fld('Graft Plan Sign Date',inp('f-graftPlanSign','date',pv.graftPlanSign||'')),fld('Expected Graft Shipping Date',inp('f-graftShipDate','date',pv.graftShipDate||''))])
     +sh('Patient Identifiers (VASCUNET Core Dataset)')
-    +gr(4,[fld('Case ID *',inp('f-id','text',pv.id||newId())),fld('Planned Procedure Date',inp('f-procedureDate','date',pv.procedureDate)),fld('Hospital No. (HN)',inp('f-hn','text',pv.hn)),fld('Age (years)',inp('f-age','number',pv.age)),fld('Sex',sel('f-sex',OPTS.sex,pv.sex)),fld('Weight (kg)',bodyMetricInp('f-weight',pv.weight||'')),
+    +gr(4,[fld('Case ID *',inp('f-id','text',pv.id||newId())),fld('Planned Procedure Date',inp('f-procedureDate','date',pv.procedureDate)),fld('Hospital No. (HN)',inp('f-hn','text',pv.hn)),fld('Age (years)',"<input id='f-age' type='number' value='"+(pv.age||'')+"' onchange='calcEGFR()' oninput='calcEGFR()'>"),fld('Sex',"<select id='f-sex' onchange='calcEGFR()'><option value=\"\">-- select --</option>"+OPTS.sex.map(function(o){return'<option value="'+esc(o)+'"'+(o===pv.sex?' selected':'')+'>'+esc(o)+'</option>';}).join('')+"</select>"),fld('Weight (kg)',bodyMetricInp('f-weight',pv.weight||'')),
 fld('Height (cm)',bodyMetricInp('f-height',pv.height||'')+'<input type="hidden" id="f-bmi" value="'+(pv.bmi||'')+'">'+'<input type="hidden" id="f-bsa" value="'+(pv.bsa||'')+'">'),
 fld('ASA Class',sel('f-asa',OPTS.asa,pv.asa))])
     +'<div id="bmiPanel" style="display:flex;gap:24px;align-items:center;padding:10px 14px;'
@@ -2790,7 +2789,7 @@ fld('ASA Class',sel('f-asa',OPTS.asa,pv.asa))])
     +'<strong id="bsaVal" style="font-size:18px;color:#08c8d0">–</strong> m²</span>'
     +'</div>'
     +sh('Comorbidities (VASCUNET Core)')
-    +gr(4,[fld('Hypertension',sel('f-htn',OPTS.yn,pv.htn)),fld('Diabetes Mellitus',sel('f-dm',OPTS.yn,pv.dm)),fld('Dyslipidaemia',sel('f-dyslipaemia',OPTS.yn,pv.dyslipaemia)),fld('Smoking',sel('f-smoking',OPTS.smoking,pv.smoking)),fld('Pack-Years',inp('f-packYears','number',pv.packYears)),fld('CAD / IHD',sel('f-cad',OPTS.yn,pv.cad)),fld('COPD',sel('f-copd',OPTS.yn,pv.copd)),fld('Peripheral Vascular Disease',sel('f-pvd',OPTS.yn,pv.pvd)),fld('CVD / Stroke',sel('f-cvd',OPTS.yn,pv.cvd)),fld('CKD Stage (KDIGO 2024)',selCkd('f-ckd',pv.ckd)),fld('Creatinine (µmol/L)',"<input id='f-creatinine' type='number' step='0.1' value='"+(pv.creatinine||'')+"' oninput='calcEGFR()' style='width:100%;background:#0d1f3c;border:1px solid #1a3652;border-radius:6px;padding:6px 10px;color:#dde5f0;font-size:13px;box-sizing:border-box'>"),fld('eGFR (ml/min/1.73m²) — CKD-EPI 2021',"<input id='f-egfr' type='number' step='0.1' value='"+(pv.egfr||'')+"' oninput='stageFromEGFR()' style='width:100%;background:#0d1f3c;border:1px solid #1a3652;border-radius:6px;padding:6px 10px;color:#dde5f0;font-size:13px;box-sizing:border-box'>"+"<div id='egfrCalcHint' style='font-size:11px;color:#4a6080;margin-top:4px'></div>")])
+    +gr(4,[fld('Hypertension',sel('f-htn',OPTS.yn,pv.htn)),fld('Diabetes Mellitus',sel('f-dm',OPTS.yn,pv.dm)),fld('Dyslipidaemia',sel('f-dyslipaemia',OPTS.yn,pv.dyslipaemia)),fld('Smoking',sel('f-smoking',OPTS.smoking,pv.smoking)),fld('Pack-Years',inp('f-packYears','number',pv.packYears)),fld('CAD / IHD',sel('f-cad',OPTS.yn,pv.cad)),fld('COPD',sel('f-copd',OPTS.yn,pv.copd)),fld('Peripheral Vascular Disease',sel('f-pvd',OPTS.yn,pv.pvd)),fld('CVD / Stroke',sel('f-cvd',OPTS.yn,pv.cvd)),fld('Creatinine (mg/dL)',"<input id='f-creatinine' type='number' step='0.01' value='"+(pv.creatinine||'')+"' oninput='calcEGFR()' onchange='calcEGFR()' style='width:100%;background:#0d1f3c;border:1px solid #1a3652;border-radius:6px;padding:6px 10px;color:#dde5f0;font-size:13px;box-sizing:border-box'>"),fld('eGFR (ml/min/1.73m²) — CKD-EPI 2021',"<input id='f-egfr' type='number' step='0.1' value='"+(pv.egfr||'')+"' oninput='stageFromEGFR()' style='width:100%;background:#0d1f3c;border:1px solid #1a3652;border-radius:6px;padding:6px 10px;color:#dde5f0;font-size:13px;box-sizing:border-box'>"+"<div id='egfrCalcHint' style='font-size:11px;color:#4a6080;margin-top:4px'></div>"),fld('CKD Stage (KDIGO 2024)',selCkd('f-ckd',pv.ckd))])
     +sh('Frailty Assessment (ESVS 2024/2026)')
     +frailtySection(pv),
     // Tab 1: Anatomy
