@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' https://*.google.com https://*.googleapis.com https://*.googleusercontent.com https://*.googledrive.com https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https://*.googleapis.com; connect-src 'self' https://*.google.com https://*.googleapis.com https://*.googleusercontent.com https://*.googledrive.com; frame-ancestors 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' https://script.google.com https://fonts.googleapis.com https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self' https://script.google.com https://pub.orcid.org; frame-ancestors 'none'">
 <title>Siriraj Complex EVAR Registry</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -2643,50 +2643,56 @@ async function deleteUser(username){
 }
 
 async function changeOwnPassword(){
-  // Show a proper modal instead of prompts
-  var oldP = prompt('Enter your CURRENT password:');
-  if(oldP === null) return;
-  var newP = prompt('Enter NEW password (min 6 characters):');
-  if(newP === null) return;
-  if(newP.length < 6){ alert('Password must be at least 6 characters'); return; }
-  var newP2 = prompt('Confirm new password:');
-  if(newP2 === null) return;
-  if(newP !== newP2){ alert('Passwords do not match'); return; }
-
+  var overlay=document.getElementById('chpwOverlay');
+  if(!overlay)return;
+  ['chpwOld','chpwNew','chpwNew2'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  var err=document.getElementById('chpwErr');
+  var spin=document.getElementById('chpwSpinner');
+  if(err){err.style.display='none';err.textContent='';}
+  if(spin)spin.style.display='none';
+  overlay.style.display='flex';
+  overlay.onclick=function(e){if(e.target===overlay)closeChpw();};
+  var oldEl=document.getElementById('chpwOld');
+  if(oldEl)setTimeout(function(){oldEl.focus();},100);
+}
+function closeChpw(){
+  var o=document.getElementById('chpwOverlay');
+  if(o)o.style.display='none';
+}
+async function submitChangePassword(){
+  var oldP=(document.getElementById('chpwOld')||{value:''}).value;
+  var newP=(document.getElementById('chpwNew')||{value:''}).value;
+  var newP2=(document.getElementById('chpwNew2')||{value:''}).value;
+  var err=document.getElementById('chpwErr');
+  var spin=document.getElementById('chpwSpinner');
+  function showErr(msg){if(err){err.textContent=msg;err.style.display='block';}}
+  if(!oldP){showErr('Please enter your current password.');return;}
+  if(newP.length<6){showErr('New password must be at least 6 characters.');return;}
+  if(newP!==newP2){showErr('Passwords do not match.');return;}
+  if(err)err.style.display='none';
+  if(spin)spin.style.display='block';
   try{
-    // Step 1: verify current password
-    var oldHash = await sha256(oldP);
-    var verifyFd = new FormData();
-    verifyFd.append('action','login');
-    verifyFd.append('username', currentUser.username);
-    verifyFd.append('passwordHash', oldHash);
-    verifyFd.append('t', Date.now());
-    var r1 = await fetch(APIURL, {method:'POST', body:verifyFd, redirect:'follow'});
-    var j1 = await r1.json();
-    if(!j1.ok){
-      alert('Current password is incorrect. Please try again.');
-      return;
-    }
-
-    // Step 2: update with new password hash
-    var newHash = await sha256(newP);
-    var fd = new FormData();
-    fd.append('action', 'upsertUser');
-    fd.append('data', JSON.stringify({
-      username: currentUser.username,
-      passwordHash: newHash
-    }));
-    var r2 = await fetch(APIURL, {method:'POST', body:fd, redirect:'follow'});
-    var j2 = await r2.json();
-
-    if(j2.saved){
-      toast('\u2705 Password changed successfully. Please use new password next login.', 'ok');
-      // Update session so they don't get logged out
-    } else {
-      alert('Failed to update password: ' + (j2.error || 'Unknown error'));
-    }
-  } catch(e) {
-    alert('Error: ' + e.message);
+    var oldHash=await sha256(oldP);
+    var vFd=new FormData();
+    vFd.append('action','login');
+    vFd.append('username',currentUser.username);
+    vFd.append('passwordHash',oldHash);
+    vFd.append('t',Date.now());
+    var r1=await fetch(APIURL,{method:'POST',body:vFd,redirect:'follow'});
+    var j1=await r1.json();
+    if(!j1.ok){if(spin)spin.style.display='none';showErr('Current password is incorrect.');return;}
+    var newHash=await sha256(newP);
+    var uFd=new FormData();
+    uFd.append('action','upsertUser');
+    uFd.append('data',JSON.stringify({username:currentUser.username,passwordHash:newHash}));
+    var r2=await fetch(APIURL,{method:'POST',body:uFd,redirect:'follow'});
+    var j2=await r2.json();
+    if(spin)spin.style.display='none';
+    if(j2.saved){closeChpw();toast('✅ Password changed successfully','ok');}
+    else{showErr('Failed: '+(j2.error||'Unknown error'));}
+  }catch(e){
+    if(spin)spin.style.display='none';
+    showErr('Connection error: '+e.message);
   }
 }
 
@@ -3600,14 +3606,13 @@ function showApp(){
 }
 function resetSetup(){localStorage.removeItem('ev5');APIURL='';isDemo=false;document.getElementById('app').style.display='none';document.getElementById('setup').style.display='flex';}
 window.onload=function(){
-  // Always require login on every page load — clear any stale session.
-  // This ensures the login screen is always shown, which is important for
-  // shared terminals and is consistent with the security improvements made.
-  try{ localStorage.removeItem(SESSION_KEY); }catch(e){}
-  document.getElementById('loginScreen').style.display='flex';
-  document.getElementById('app').style.display='none';
-  var setupEl=document.getElementById('setup');
-  if(setupEl)setupEl.style.display='none';
+  try{localStorage.removeItem(SESSION_KEY);}catch(e){}
+  var ls=document.getElementById('loginScreen');
+  if(ls)ls.style.display='flex';
+  var ap=document.getElementById('app');
+  if(ap)ap.style.display='none';
+  var su=document.getElementById('setup');
+  if(su)su.style.display='none';
   setTimeout(function(){
     var u=document.getElementById('loginUser');
     if(u)u.focus();
@@ -3714,6 +3719,27 @@ window.onload=function(){
       <div style="display:flex;gap:8px">
         <button onclick="saveNewUser()" style="background:#0db87a;border:none;color:#fff;border-radius:6px;padding:7px 18px;font-size:13px;cursor:pointer;font-weight:600">Save User</button>
         <button onclick="document.getElementById('addUserForm').style.display='none'" style="background:none;border:1px solid #1a3652;color:#7a90b0;border-radius:6px;padding:7px 14px;font-size:13px;cursor:pointer">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Change Password Modal -->
+<div id="chpwOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9300;display:none;align-items:center;justify-content:center">
+  <div style="background:#0d1f3c;border:1px solid #1a3652;border-radius:12px;padding:28px 32px;width:360px;max-width:95vw">
+    <div style="font-size:16px;font-weight:700;color:#dde5f0;margin-bottom:18px">Change Password</div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div><label style="font-size:11px;color:#7a90b0;display:block;margin-bottom:5px">Current Password</label>
+        <input id="chpwOld" type="password" placeholder="Current password" style="width:100%;background:#081428;border:1px solid #1a3652;border-radius:6px;padding:8px 12px;color:#dde5f0;font-size:14px;box-sizing:border-box"></div>
+      <div><label style="font-size:11px;color:#7a90b0;display:block;margin-bottom:5px">New Password</label>
+        <input id="chpwNew" type="password" placeholder="Min 6 characters" style="width:100%;background:#081428;border:1px solid #1a3652;border-radius:6px;padding:8px 12px;color:#dde5f0;font-size:14px;box-sizing:border-box"></div>
+      <div><label style="font-size:11px;color:#7a90b0;display:block;margin-bottom:5px">Confirm New Password</label>
+        <input id="chpwNew2" type="password" placeholder="Re-enter new password" style="width:100%;background:#081428;border:1px solid #1a3652;border-radius:6px;padding:8px 12px;color:#dde5f0;font-size:14px;box-sizing:border-box"></div>
+      <div id="chpwErr" style="color:#e03030;font-size:12px;display:none"></div>
+      <div id="chpwSpinner" style="color:#7a90b0;font-size:12px;display:none">⧗ Updating...</div>
+      <div style="display:flex;gap:10px;margin-top:4px">
+        <button onclick="submitChangePassword()" style="flex:1;background:#1a6fd4;border:none;color:#fff;border-radius:6px;padding:9px;font-size:13px;font-weight:700;cursor:pointer">Save</button>
+        <button onclick="closeChpw()" style="flex:1;background:#0d1f3c;border:1px solid #1a3652;color:#7a90b0;border-radius:6px;padding:9px;font-size:13px;cursor:pointer">Cancel</button>
       </div>
     </div>
   </div>
