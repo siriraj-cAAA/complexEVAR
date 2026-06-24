@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' https://script.google.com https://fonts.googleapis.com https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self' https://script.google.com https://pub.orcid.org; frame-ancestors 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' https://*.google.com https://*.googleapis.com https://*.googleusercontent.com https://*.googledrive.com https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https://*.googleapis.com; connect-src 'self' https://*.google.com https://*.googleapis.com https://*.googleusercontent.com https://*.googledrive.com; frame-ancestors 'none'">
 <title>Siriraj Complex EVAR Registry</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -2631,9 +2631,11 @@ async function sendUserUpdate(data){
 
 async function deleteUser(username){
   if(!confirm('Delete user "'+username+'"? This cannot be undone.'))return;
-  var url=APIURL+'?action=deleteUser&username='+encodeURIComponent(username)+'&t='+Date.now();
+  var delFd=new FormData();
+  delFd.append('action','deleteUser');
+  delFd.append('username',username);
   try{
-    var r=await fetch(url,{redirect:'follow'});
+    var r=await fetch(APIURL,{method:'POST',body:delFd,redirect:'follow'});
     var j=await r.json();
     if(j.deleted){toast('Deleted user: '+j.deleted,'ok');await refreshUserList();}
     else toast('Error: '+(j.error||''),'err');
@@ -2654,9 +2656,12 @@ async function changeOwnPassword(){
   try{
     // Step 1: verify current password
     var oldHash = await sha256(oldP);
-    var verifyUrl = APIURL+'?action=login&username='+encodeURIComponent(currentUser.username)
-      +'&passwordHash='+encodeURIComponent(oldHash)+'&t='+Date.now();
-    var r1 = await fetch(verifyUrl, {method:'GET', redirect:'follow'});
+    var verifyFd = new FormData();
+    verifyFd.append('action','login');
+    verifyFd.append('username', currentUser.username);
+    verifyFd.append('passwordHash', oldHash);
+    verifyFd.append('t', Date.now());
+    var r1 = await fetch(APIURL, {method:'POST', body:verifyFd, redirect:'follow'});
     var j1 = await r1.json();
     if(!j1.ok){
       alert('Current password is incorrect. Please try again.');
@@ -3595,18 +3600,18 @@ function showApp(){
 }
 function resetSetup(){localStorage.removeItem('ev5');APIURL='';isDemo=false;document.getElementById('app').style.display='none';document.getElementById('setup').style.display='flex';}
 window.onload=function(){
-  // Always start at login screen
+  // Always require login on every page load — clear any stale session.
+  // This ensures the login screen is always shown, which is important for
+  // shared terminals and is consistent with the security improvements made.
+  try{ localStorage.removeItem(SESSION_KEY); }catch(e){}
   document.getElementById('loginScreen').style.display='flex';
   document.getElementById('app').style.display='none';
   var setupEl=document.getElementById('setup');
   if(setupEl)setupEl.style.display='none';
-  // Try restore session (only if previously logged in)
-  if(!tryRestoreSession()){
-    setTimeout(function(){
-      var u=document.getElementById('loginUser');
-      if(u)u.focus();
-    },100);
-  }
+  setTimeout(function(){
+    var u=document.getElementById('loginUser');
+    if(u)u.focus();
+  },100);
 };
 
 </script>
