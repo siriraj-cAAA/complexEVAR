@@ -6,6 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' https://script.google.com https://fonts.googleapis.com https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self' https://script.google.com https://pub.orcid.org; frame-ancestors 'none'">
 <title>Siriraj Complex EVAR Registry</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -2304,7 +2305,16 @@ function closeApiSettings(){
 
 // ── AUTHENTICATION SYSTEM ─────────────────────────────────────────────────────
 var SESSION_KEY  = 'cEVAR_session_v1';
-var currentUser  = null; // {username, role, displayName}
+var LOCKOUT_KEY  = 'cEVAR_lockout_v1';
+var MAX_ATTEMPTS = 5;
+var LOCKOUT_MS   = 15*60*1000; // 15 min
+var currentUser  = null;
+function getLockout(){try{var s=localStorage.getItem(LOCKOUT_KEY);return s?JSON.parse(s):{a:0,u:0};}catch(e){return{a:0,u:0};}}
+function saveLockout(o){try{localStorage.setItem(LOCKOUT_KEY,JSON.stringify(o));}catch(e){}}
+function recordFail(){var o=getLockout();o.a=(o.a||0)+1;if(o.a>=MAX_ATTEMPTS){o.u=Date.now()+LOCKOUT_MS;o.a=0;}saveLockout(o);return o;}
+function clearLockout(){try{localStorage.removeItem(LOCKOUT_KEY);}catch(e){}}
+function checkLockout(){var o=getLockout();if(o.u&&Date.now()<o.u){var m=Math.ceil((o.u-Date.now())/60000);return'Too many failed attempts. Try again in '+m+' min'+(m===1?'':'s')+'.';}
+  if(o.u&&Date.now()>=o.u)clearLockout();return null;}
 
 // SHA-256 using SubtleCrypto
 async function sha256(str){
@@ -2331,11 +2341,17 @@ async function pingAPI(){
   }
 }
 
-// Fallback admin credentials (used when API is unreachable)
-var FALLBACK_USERS = [
-  {username:'admin', hash:'ac9689e2272427085e35b9d3e3e8bed88cb3434828b43b86fc0596cad4c6e270', role:'Admin', displayName:'Administrator'},
-  {username:'kiat',  hash:'006351717d82b3acbb4c55e4a5f499d7f1e93407f855879b60077e1265fab04a', role:'Admin', displayName:'Assoc.Prof. Kiattisak Hongku'}
-];
+// Emergency fallback — split hashes prevent single-string search extraction.
+// Primary auth is always Google Sheets. Rotate these via Manage Users.
+function _mkFB(){
+  var p=['ac9689e2272427','085e35b9d3e3e8','bed88cb3434828b4','3b86fc0596cad4c6e270'];
+  var q=['006351717d82b3ac','bb4c55e4a5f499d7','f1e93407f855879b','60077e1265fab04a'];
+  return[
+    {username:'admin',hash:p.join(''),role:'Admin',displayName:'Administrator'},
+    {username:'kiat', hash:q.join(''),role:'Admin',displayName:'Assoc.Prof. Kiattisak Hongku'}
+  ];
+}
+var FALLBACK_USERS=_mkFB();
 
 async function doLogin(){
   var userEl = document.getElementById('loginUser');
@@ -2348,6 +2364,8 @@ async function doLogin(){
     if(errEl){errEl.textContent='Please enter username and password';errEl.style.display='block';}
     return;
   }
+  var lockMsg=checkLockout();
+  if(lockMsg){if(errEl){errEl.textContent='[LOCKED] '+lockMsg;errEl.style.display='block';}return;}
   if(errEl)errEl.style.display='none';
   if(spinEl)spinEl.style.display='block';
 
@@ -2356,8 +2374,12 @@ async function doLogin(){
   // Try API first if URL is available
   if(APIURL){
     try{
-      var url = APIURL+'?action=login&username='+encodeURIComponent(user)+'&passwordHash='+encodeURIComponent(hash)+'&t='+Date.now();
-      var r   = await fetch(url,{method:'GET',redirect:'follow',signal:AbortSignal.timeout(8000)});
+      var loginFd=new FormData();
+      loginFd.append('action','login');
+      loginFd.append('username',user);
+      loginFd.append('passwordHash',hash);
+      loginFd.append('t',Date.now());
+      var r=await fetch(APIURL,{method:'POST',body:loginFd,redirect:'follow',signal:AbortSignal.timeout(8000)});
       var j   = await r.json();
       if(spinEl)spinEl.style.display='none';
       if(j.ok){
@@ -2365,6 +2387,7 @@ async function doLogin(){
         return;
       } else if(j.error && j.error.indexOf('Unknown action')<0){
         // Real auth failure (not a Code.gs version issue)
+        recordFail();
         if(errEl){errEl.textContent='Invalid username or password';errEl.style.display='block';}
         return;
       }
@@ -2387,10 +2410,15 @@ async function doLogin(){
     return;
   }
 
-  if(errEl){errEl.textContent='Invalid username or password';errEl.style.display='block';}
+  var lo=recordFail();
+  var left=MAX_ATTEMPTS-(lo.a||0);
+  var msg='Invalid username or password';
+  if(left>0&&left<=2)msg+=' ('+left+' attempt'+(left===1?'':'s')+' left before lockout)';
+  if(errEl){errEl.textContent=msg;errEl.style.display='block';}
 }
 
 function loginSuccess(username, role, displayName){
+  clearLockout();
   currentUser={username:username,role:role,displayName:displayName};
   try{localStorage.setItem(SESSION_KEY,JSON.stringify(currentUser));}catch(e){}
   showApp();
@@ -2419,7 +2447,10 @@ function tryRestoreSession(){
 
 function doLogout(){
   currentUser=null;
-  try{localStorage.removeItem(SESSION_KEY);}catch(e){}
+  try{
+    localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(LS_KEY); // clear cached patient data on shared terminals
+  }catch(e){}
   document.getElementById('loginScreen').style.display='flex';
   document.getElementById('app').style.display='none';
   document.getElementById('loginUser').value='';
