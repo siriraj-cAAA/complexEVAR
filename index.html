@@ -335,6 +335,9 @@ input:focus,select:focus{border-color:#08c8d0}
         <button class="ftab" onclick="showFTab(4)">Follow-Up</button>
       </div>
       <div class="fbody" id="formBody"></div>
+      <!-- Persistent hidden inputs — survive tab switching so saveForm() always has key values -->
+      <input type="hidden" id="persist-id" value="">
+      <input type="hidden" id="persist-procedureDate" value="">
     </div>
     <!-- EXPORT -->
     <div class="pg" id="pg-export">
@@ -1630,6 +1633,26 @@ var LS_KEY='cEVAR_patients_v2';
 function lsSave(){
   try{localStorage.setItem(LS_KEY,JSON.stringify(patients));}catch(e){console.warn('LS save:',e);}
 }
+// Normalize date fields from Sheets — converts 'Wed Jun 24 2026 00:00:00 GMT+0700' -> '2026-06-24'
+function normDate(v){
+  if(!v||typeof v!=='string')return v;
+  // Already in yyyy-MM-dd format
+  if(/^\d{4}-\d{2}-\d{2}$/.test(v))return v;
+  // Try parsing as date
+  try{
+    var d=new Date(v);
+    if(!isNaN(d.getTime())){
+      return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    }
+  }catch(e){}
+  return v;
+}
+var DATE_FIELDS=['dateRegistry','dateCTA','datePreop','graftPlanSign','graftShipDate','procedureDate','actualProcedureDate'];
+function normalizePtDates(p){
+  DATE_FIELDS.forEach(function(k){if(p[k])p[k]=normDate(p[k]);});
+  return p;
+}
+
 function lsLoad(){
   try{
     var d=localStorage.getItem(LS_KEY);
@@ -1639,7 +1662,7 @@ function lsLoad(){
         if(typeof p.frailItems==='string'){try{p.frailItems=JSON.parse(p.frailItems);}catch(e){p.frailItems={};}}
         if(typeof p.adjunctAortic==='string'){try{p.adjunctAortic=JSON.parse(p.adjunctAortic);}catch(e){p.adjunctAortic={};}}
         if(typeof p.deviceInventory==='string'){try{p.deviceInventory=JSON.parse(p.deviceInventory);}catch(e){p.deviceInventory={};}}
-        return p;
+        return normalizePtDates(p);
       });
       return true;
     }
@@ -3333,7 +3356,7 @@ async function loadData(){
         if(typeof p.frailItems==='string'){try{p.frailItems=JSON.parse(p.frailItems);}catch(e){p.frailItems={};}}
         if(typeof p.adjunctAortic==='string'){try{p.adjunctAortic=JSON.parse(p.adjunctAortic);}catch(e){p.adjunctAortic={};}}
         if(typeof p.deviceInventory==='string'){try{p.deviceInventory=JSON.parse(p.deviceInventory);}catch(e){p.deviceInventory={};}}
-        return p;
+        return normalizePtDates(p);
       });
 
       // ── DATA-LOSS SAFEGUARD ──────────────────────────────────────────────
@@ -3537,6 +3560,13 @@ function openForm(id){
   showPg('form');
 }
 function showFTab(i){
+  // Before switching away from Tab 0, persist key fields
+  var curId=document.getElementById('f-id');
+  var curPd=document.getElementById('f-procedureDate');
+  var curDr=document.getElementById('f-dateRegistry');
+  if(curId){var ph=document.getElementById('persist-id');if(ph)ph.value=curId.value;}
+  if(curPd){var php=document.getElementById('persist-procedureDate');if(php)php.value=curPd.value;}
+  if(curDr){var phd=document.getElementById('persist-dateRegistry');if(phd)phd.value=curDr.value;}
   document.querySelectorAll('.ftab').forEach(function(t,j){t.classList.toggle('active',j===i);});
   document.getElementById('formBody').innerHTML=formTabs[i]||'';
   if(i===2){attachOpTimeListeners();toggleDeviceOpts();setTimeout(initAllCustomSelects,80);}
@@ -3571,9 +3601,16 @@ function showFTab(i){
   }
 }
 async function saveForm(){
-  var id=gv('f-id').trim();
-  if(!id){alert('Case ID required');return;}
-  if(!gv('f-procedureDate')){alert('Procedure Date required');return;}
+  // Use persist inputs as fallback when Tab 0 is not currently rendered
+  var idEl=document.getElementById('f-id');
+  var persistId=document.getElementById('persist-id');
+  var id=(idEl?idEl.value.trim():'') || (persistId?persistId.value.trim():'');
+  if(!id){alert('Case ID required\nPlease go to Tab 1 (Demographics) and enter a Case ID');return;}
+  // Procedure date: try current tab, then persist
+  var pdEl=document.getElementById('f-procedureDate');
+  var persistPd=document.getElementById('persist-procedureDate');
+  var procDate=(pdEl?pdEl.value:'') || (persistPd?persistPd.value:'');
+  if(!procDate){alert('Planned Procedure Date required\nPlease go to Tab 1 (Demographics) and enter a date');return;}
   var access=collectAccess();
   var device=collectDevice();
   var tvs=collectTVAll();
