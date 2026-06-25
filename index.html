@@ -3558,6 +3558,22 @@ function openForm(id){
   document.getElementById('formTitle').textContent=pt?'Edit: '+pt.id:'New Case';
   buildTabs(pt);showFTab(0);
   showPg('form');
+  // Seed persist inputs immediately so save works from any tab
+  setTimeout(function(){
+    var idEl=document.getElementById('f-id');
+    var pdEl=document.getElementById('f-procedureDate');
+    var ph=document.getElementById('persist-id');
+    var php=document.getElementById('persist-procedureDate');
+    if(idEl&&ph) ph.value=idEl.value;
+    if(pdEl&&php) php.value=pdEl.value;
+    // Also watch f-id for changes
+    if(idEl) idEl.addEventListener('input',function(){
+      var p=document.getElementById('persist-id');if(p)p.value=idEl.value;
+    });
+    if(pdEl) pdEl.addEventListener('change',function(){
+      var p=document.getElementById('persist-procedureDate');if(p)p.value=pdEl.value;
+    });
+  },100);
 }
 function showFTab(i){
   // Before switching away from Tab 0, persist key fields
