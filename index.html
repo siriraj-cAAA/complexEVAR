@@ -202,6 +202,23 @@ input:focus,select:focus{border-color:#08c8d0}
     <button class="login-btn" onclick="doLogin()">Sign In</button>
     <div class="login-err" id="loginErr">Invalid username or password</div>
     <div id="loginSpinner" style="text-align:center;color:#7a90b0;font-size:12px;margin-top:10px;display:none">⧗ Authenticating…</div>
+    <div style="margin-top:18px;border-top:1px solid #1a3652;padding-top:14px">
+      <details id="apiLoginDetails">
+        <summary style="font-size:11px;color:#4a6080;cursor:pointer;list-style:none;text-align:center">⚙️ Change API URL (Admin only)</summary>
+        <div style="margin-top:8px" id="apiLoginBox">
+          <div style="font-size:11px;color:#7a90b0;margin-bottom:5px">Admin PIN:</div>
+          <input id="loginPinInp" type="password" maxlength="8" placeholder="Enter Admin PIN"
+            style="width:100%;background:#081428;border:1px solid #1a3652;border-radius:6px;padding:7px 10px;color:#dde5f0;font-size:13px;box-sizing:border-box;margin-bottom:8px;letter-spacing:4px">
+          <div id="apiLoginUrlBox" style="display:none">
+            <div style="font-size:11px;color:#7a90b0;margin-bottom:5px;margin-top:4px">New Apps Script URL:</div>
+            <input id="loginApiInp" type="text" placeholder="https://script.google.com/macros/s/.../exec"
+              style="width:100%;background:#081428;border:1px solid #1a6fd4;border-radius:6px;padding:7px 10px;color:#dde5f0;font-size:11px;box-sizing:border-box;margin-bottom:8px">
+          </div>
+          <div id="loginPinErr" style="color:#e03030;font-size:11px;margin-bottom:6px;display:none">Incorrect PIN</div>
+          <button onclick="(function(){var pin=document.getElementById('loginPinInp').value;var urlBox=document.getElementById('apiLoginUrlBox');var err=document.getElementById('loginPinErr');var saved=localStorage.getItem('cEVAR_adminPin_v1')||'2567';if(urlBox.style.display==='none'){  if(pin!==saved){err.style.display='block';return;}  err.style.display='none';  urlBox.style.display='block';  this.textContent='Save URL';} else {  var u=document.getElementById('loginApiInp').value.trim();  if(!u||u.indexOf('script.google.com/macros')<0){alert('Invalid URL');return;}  localStorage.setItem('ev5',u);APIURL=u;  alert('\u2705 Saved! Now login.');  document.getElementById('apiLoginDetails').removeAttribute('open');}})()" style="width:100%;background:#1a6fd4;border:none;color:#fff;border-radius:6px;padding:7px;font-size:12px;cursor:pointer;font-weight:600">Unlock</button>
+        </div>
+      </details>
+    </div>
 
   </div>
 </div>
@@ -3634,6 +3651,60 @@ function showApp(){
   if(app) app.style.display='flex';
 }
 function resetSetup(){localStorage.removeItem('ev5');APIURL='';isDemo=false;document.getElementById('app').style.display='none';document.getElementById('setup').style.display='flex';}
+// ── AUTO-SAVE BEFORE PAGE CLOSE ─────────────────────────────────────────────
+// Saves the form silently whenever the user navigates away or closes the tab.
+// Uses synchronous localStorage write (always safe) + async Sheets push.
+window.addEventListener('beforeunload', function(e){
+  // Only auto-save if a form is currently open (user is editing a case)
+  var formPage = document.getElementById('pg-form');
+  if(!formPage || !formPage.classList.contains('active')) return;
+  if(!currentUser) return; // not logged in
+
+  try{
+    // Collect form data the same way saveForm() does
+    var id = editId || ('SAC-AUTO-'+Date.now());
+    var access  = typeof collectAccess       === 'function' ? collectAccess()       : {};
+    var device  = typeof collectDevice       === 'function' ? collectDevice()       : {};
+    var tvs     = typeof collectTVAll        === 'function' ? collectTVAll()        : {};
+    var fri     = typeof collectFrailtyItems === 'function' ? collectFrailtyItems() : {};
+    var adjA    = typeof collectAdjunctAortic=== 'function' ? collectAdjunctAortic(): {};
+    var devInv  = typeof collectDeviceInventory==='function'? collectDeviceInventory():{};
+    var fus     = typeof collectFUs          === 'function' ? collectFUs()          : [];
+
+    var pt = Object.assign(
+      {id:id, _autoSaved: new Date().toISOString()},
+      access, device, tvs, fri, adjA, devInv,
+      {followups: fus}
+    );
+
+    // Serialize nested objects
+    ['mfi5Items','frailItems','adjunctAortic','deviceInventory'].forEach(function(k){
+      if(pt[k] && typeof pt[k]==='object'){
+        try{pt[k]=JSON.stringify(pt[k]);}catch(ex){}
+      }
+    });
+    if(pt.followups && typeof pt.followups==='object'){
+      pt.followupsJson = JSON.stringify(pt.followups);
+    }
+
+    // Save to localStorage immediately (synchronous — guaranteed before close)
+    var existing = patients.findIndex(function(p){return p.id===id;});
+    if(existing>=0) patients[existing]=pt; else patients.push(pt);
+    try{localStorage.setItem(LS_KEY, JSON.stringify(patients));}catch(ex){}
+
+    // Fire async Sheets push (may or may not complete before page closes,
+    // but localStorage copy is always safe)
+    if(!isDemo && APIURL){
+      var fd = new FormData();
+      fd.append('action','upsert');
+      fd.append('data', JSON.stringify(pt));
+      navigator.sendBeacon(APIURL, fd); // sendBeacon is designed for this use-case
+    }
+  }catch(ex){
+    console.warn('Auto-save error:', ex.message);
+  }
+});
+
 window.onload=function(){
   try{localStorage.removeItem(SESSION_KEY);}catch(e){}
   var ls=document.getElementById('loginScreen');
