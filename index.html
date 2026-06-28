@@ -1297,6 +1297,29 @@ var BRIDGING_STENTS=['','BeGraft','BeGraft Plus','BeFlared','V12','Radiant','VBX
 var TV_CONFIG=['','Fenestrated','Branched \u2013 Internal/External','Branched \u2013 Internal','Branched \u2013 Short branch','Branched \u2013 Semi branch','Branched \u2013 Twin branch'];
 var TV_BRANCHED_OPTS=['Branched \u2013 Internal/External','Branched \u2013 Internal','Branched \u2013 Short branch','Branched \u2013 Semi branch','Branched \u2013 Twin branch'];
 var TV_ORIENTATION=['','Upward','Downward'];
+function tvStentRowHtml(prefix, si, s){
+  s=s||{};
+  return '<div class="tv-stent-row" style="display:grid;grid-template-columns:1fr 80px 80px auto;gap:6px;align-items:center;margin-bottom:4px">'
+    +'<select id="'+prefix+'Stent'+si+'" style="background:#0d1f3c;border:1px solid #1a3652;border-radius:6px;padding:5px 8px;color:#dde5f0;font-size:12px">'
+    +BRIDGING_STENTS.map(function(o){return'<option value="'+o+'"'+(s.stent===o?' selected':'')+'>'+o+'</option>';}).join('')
+    +'</select>'
+    +'<input id="'+prefix+'StentSz'+si+'" type="number" placeholder="Size mm" value="'+(s.sz||'')+'" style="background:#0d1f3c;border:1px solid #1a3652;border-radius:6px;padding:5px 8px;color:#dde5f0;font-size:12px">'
+    +'<input id="'+prefix+'StentLen'+si+'" type="number" placeholder="Length mm" value="'+(s.len||'')+'" style="background:#0d1f3c;border:1px solid #1a3652;border-radius:6px;padding:5px 8px;color:#dde5f0;font-size:12px">'
+    +(si>0?'<button type="button" onclick="removeTVStent(this)" style="background:#2a0d0d;border:1px solid #e03030;color:#e03030;border-radius:5px;padding:3px 8px;font-size:11px;cursor:pointer">×</button>':'<div></div>')
+    +'</div>';
+}
+function addTVStent(prefix){
+  var list=document.getElementById(prefix+'StentList');
+  if(!list)return;
+  var si=list.querySelectorAll('.tv-stent-row').length;
+  var div=document.createElement('div');
+  div.innerHTML=tvStentRowHtml(prefix,si,{});
+  list.appendChild(div.firstElementChild);
+}
+function removeTVStent(btn){
+  var row=btn.closest('.tv-stent-row');
+  if(row)row.remove();
+}
 var ADJUNCTS=['Flaring balloon (inlet)','Flaring balloon (inside TV)','Reinforcing stent','Distal relining stent','Total relining stent'];
 function tvVesselHtml(label, prefix, pv){
   var cfg    = pv[prefix+'Config']||'';
@@ -1312,6 +1335,7 @@ function tvVesselHtml(label, prefix, pv){
     {label:'Reinforcing stent',           stentField:true,  stentPlaceholder:'Stent name'},
     {label:'Distal relining stent',       stentField:true,  stentPlaceholder:'Stent name'},
     {label:'Total relining stent',        stentField:true,  stentPlaceholder:'Stent name'},
+    {label:'Branch cuff occlusion',       stentField:false, occlusion:true, sizePlaceholder:'Size (mm)'},
   ];
   return '<div style="background:#081428;border:1px solid #1a3652;border-radius:8px;padding:14px 16px;margin-bottom:12px">'
     +'<div style="font-size:14px;font-weight:700;color:#08c8d0;margin-bottom:10px">'+label+'</div>'
@@ -1325,9 +1349,21 @@ function tvVesselHtml(label, prefix, pv){
     +'<select id="'+prefix+'Orient" style="background:#0d1f3c;border:1px solid #08c8d0;border-radius:6px;padding:6px 10px;color:#08c8d0;font-size:13px;min-width:120px">'
     +TV_ORIENTATION.map(function(o){return'<option value="'+o+'"'+(orient===o?' selected':'')+'>'+o+'</option>';}).join('')
     +'</select></div>'
-    +fld('Bridging Stent',sel(prefix+'Stent',BRIDGING_STENTS,stent))
-    +fld('Size (mm)',inp(prefix+'StentSz','number',size))
-    +fld('Length (mm)',inp(prefix+'StentLen','number',len))
+    +'</div>'
+    // Multiple bridging stents
+    +'<div style="margin-bottom:12px">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
+    +'<div style="font-size:11px;color:#7a90b0;text-transform:uppercase;letter-spacing:.04em">Bridging Stent(s)</div>'
+    +'<button type="button" onclick="addTVStent(\''+prefix+'\')" style="background:#0d1f3c;border:1px solid #1a6fd4;color:#1a6fd4;border-radius:5px;padding:3px 10px;font-size:11px;cursor:pointer">+ Add stent</button>'
+    +'</div>'
+    +'<div id="'+prefix+'StentList">'
+    +(function(){
+      var stents = pv[prefix+'StentList'] || (stent ? [{stent:stent,sz:size,len:len}] : [{stent:'',sz:'',len:''}]);
+      return stents.map(function(s,si){
+        return tvStentRowHtml(prefix, si, s);
+      }).join('');
+    }())
+    +'</div>'
     +'</div>'
     +'<div style="font-size:11px;color:#7a90b0;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Adjuncts</div>'
     +'<div style="display:flex;flex-direction:column;gap:6px">'
@@ -1347,7 +1383,13 @@ function tvVesselHtml(label, prefix, pv){
         +(a.stentField
           ?'<input id="'+akey+'Stent" type="text" placeholder="'+a.stentPlaceholder+'" value="'+(aVal.stent||'')+'" style="flex:1;min-width:140px;background:#081428;border:1px solid #1a3652;border-radius:5px;color:#dde5f0;font-size:12px;padding:4px 8px">'
           :'')
-        +'<input id="'+akey+'Sz" type="number" placeholder="Size (mm)" value="'+(aVal.sz||'')+'" style="width:100px;background:#081428;border:1px solid #1a3652;border-radius:5px;color:#dde5f0;font-size:12px;padding:4px 8px">'
+        +(a.occlusion
+          ?'<select id="'+akey+'Dev" style="flex:1;min-width:160px;background:#081428;border:1px solid #1a3652;border-radius:5px;color:#dde5f0;font-size:12px;padding:4px 8px">'
+          +['','Amplatzer Vascular Plug I (AVP-I)','Amplatzer Vascular Plug II (AVP-II)','Coils'].map(function(o){return'<option value="'+o+'"'+(aVal.dev===o?' selected':'')+'>'+o+'</option>';}).join('')
+          +'</select>'
+          +'<input id="'+akey+'OccSz" type="number" placeholder="Size (mm)" value="'+(aVal.occSz||'')+'" style="width:90px;background:#081428;border:1px solid #1a3652;border-radius:5px;color:#dde5f0;font-size:12px;padding:4px 8px">'
+          :'')
+        +(!a.occlusion?'<input id="'+akey+'Sz" type="number" placeholder="'+a.sizePlaceholder+'" value="'+(aVal.sz||'')+'" style="width:100px;background:#081428;border:1px solid #1a3652;border-radius:5px;color:#dde5f0;font-size:12px;padding:4px 8px">':'')
         +'</div>'
         +'</div>';
     }).join('')
@@ -1411,15 +1453,35 @@ function collectDevice(){
 }
 function collectTV(prefix){
   var out={};
-  ['Config','Orient','Stent','StentSz','StentLen'].forEach(function(k){
-    out[prefix+k]=gv(prefix+k);
-  });
+  out[prefix+'Config']=gv(prefix+'Config');
+  out[prefix+'Orient']=gv(prefix+'Orient');
+  // Collect multiple bridging stents
+  var stentList=document.getElementById(prefix+'StentList');
+  var stents=[];
+  if(stentList){
+    stentList.querySelectorAll('.tv-stent-row').forEach(function(row,si){
+      stents.push({
+        stent:gv(prefix+'Stent'+si),
+        sz:gv(prefix+'StentSz'+si),
+        len:gv(prefix+'StentLen'+si)
+      });
+    });
+  }
+  out[prefix+'StentList']=stents;
+  // Keep legacy fields for backward compat
+  out[prefix+'Stent']=stents[0]?stents[0].stent:'';
+  out[prefix+'StentSz']=stents[0]?stents[0].sz:'';
+  out[prefix+'StentLen']=stents[0]?stents[0].len:'';
   var adj={};
   [0,1,2,3,4].forEach(function(i){
     var akey=prefix+'adj'+i;
     var cbEl=document.getElementById(akey+'Used');
     if(cbEl){
-      adj[i]={used:cbEl.checked||false,sz:gv(akey+'Sz'),stent:gv(akey+'Stent')};
+      adj[i]={used:cbEl.checked||false,
+             sz:gv(akey+'Sz'),
+             stent:gv(akey+'Stent'),
+             dev:gv(akey+'Dev'),
+             occSz:gv(akey+'OccSz')};
     }
   });
   out[prefix+'Adj']=adj;
@@ -2801,7 +2863,7 @@ function devRowHtml(grpId, idx, item){
   var name   = item.name   || '';
   var sapNum = item.sapNum || '';
   var qty    = item.qty    || '1';
-  return '<div id="devrow-'+grpId+'-'+idx+'" style="display:grid;grid-template-columns:2fr 140px 60px 32px;gap:8px;align-items:center;margin-bottom:8px">'
+  return '<div id="devrow-'+grpId+'-'+idx+'" style="display:grid;grid-template-columns:2fr 140px 60px 32px 32px;gap:8px;align-items:center;margin-bottom:8px">'
     // Device name with dropdown from known items
     + '<div style="position:relative">'
     + '<input id="devname-'+grpId+'-'+idx+'" type="text" value="'+esc(name)+'" placeholder="Device name" list="devlist-'+grpId+'-'+idx+'"'
@@ -2821,6 +2883,8 @@ function devRowHtml(grpId, idx, item){
     // Remove button
     + '<button type="button" onclick="removeDevRow(\''+grpId+'\','+idx+')"'
     + ' style="background:#1a0d0d;border:1px solid #5a2020;color:#e03030;border-radius:5px;width:28px;height:28px;cursor:pointer;font-size:14px;line-height:1">&times;</button>'
+    + '<button type="button" onclick="copyDevRow(\''+grpId+'\','+idx+')" title="Copy this row"'
+    + ' style="background:#0d2040;border:1px solid #1a6fd4;color:#1a6fd4;border-radius:5px;width:28px;height:28px;cursor:pointer;font-size:13px;line-height:1">⧉</button>'
     + '</div>';
 }
 
@@ -2832,9 +2896,20 @@ function addDevRow(grpId){
   var div = document.createElement('div');
   div.innerHTML = devRowHtml(grpId, newIdx, {});
   container.appendChild(div.firstElementChild);
-  // Focus new name field
   var inp = document.getElementById('devname-'+grpId+'-'+newIdx);
   if(inp) inp.focus();
+}
+function copyDevRow(grpId, idx){
+  var container = document.getElementById('devrows-'+grpId);
+  if(!container) return;
+  // Read current row values
+  var name   = (document.getElementById('devname-'+grpId+'-'+idx)||{value:''}).value;
+  var sapNum = (document.getElementById('devsap-'+grpId+'-'+idx)||{value:''}).value;
+  var qty    = (document.getElementById('devqty-'+grpId+'-'+idx)||{value:'1'}).value;
+  var newIdx = container.querySelectorAll('[id^="devrow-'+grpId+'"]').length;
+  var div = document.createElement('div');
+  div.innerHTML = devRowHtml(grpId, newIdx, {name:name, sapNum:sapNum, qty:qty});
+  container.appendChild(div.firstElementChild);
 }
 
 function removeDevRow(grpId, idx){
@@ -3603,6 +3678,12 @@ function showFTab(i){
   }
 }
 async function saveForm(){
+  // Snapshot whatever tab is currently visible BEFORE collecting
+  // This ensures save works correctly even if user hasn't switched tabs
+  document.querySelectorAll('#formBody input,#formBody select,#formBody textarea').forEach(function(el){
+    if(!el.id) return;
+    _tabData[el.id] = (el.type==='checkbox') ? el.checked : el.value;
+  });
   // Use persist inputs as fallback when Tab 0 is not currently rendered
   // _currentCaseId is set at openForm and never cleared by tab switches
   var idEl=document.getElementById('f-id');
@@ -3628,6 +3709,12 @@ async function saveForm(){
   // doing the same server-side. If either layer is ever skipped or out of
   // sync, the other still protects the data — defense in depth, since a
   // raw object written into a Sheets cell silently becomes "[object Object]".
+  // Serialize StentList arrays for each vessel
+  ['tv_ca_','tv_sma_','tv_rra_','tv_lra_','tv_oth_'].forEach(function(p){
+    if(pt[p+'StentList'] && typeof pt[p+'StentList']==='object'){
+      try{pt[p+'StentList']=JSON.stringify(pt[p+'StentList']);}catch(e){}
+    }
+  });
   ['mfi5Items','frailItems','adjunctAortic','deviceInventory'].forEach(function(k){
     if(pt[k] && typeof pt[k]==='object'){
       try{ pt[k]=JSON.stringify(pt[k]); }catch(e){ console.error('Failed to stringify '+k, e); }
