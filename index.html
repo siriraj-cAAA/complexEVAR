@@ -1600,10 +1600,10 @@ function lsSave(){
 // Normalize date fields from Sheets — converts 'Wed Jun 24 2026 00:00:00 GMT+0700' -> '2026-06-24'
 function graftDateFld(id,val){
   var isNA=val==='N/A';
-  return '<div style="display:flex;align-items:center;gap:8px">'
-    +'<input id="'+id+'" type="date" value="'+esc(isNA?'':val)+'"'+(isNA?' disabled':'')+' style="flex:1;background:#0d1f3c;border:1px solid #1a3652;border-radius:6px;padding:6px 10px;color:#dde5f0;font-size:13px;box-sizing:border-box">'
-    +'<label style="display:flex;align-items:center;gap:4px;color:#7a90b0;font-size:12px;white-space:nowrap;cursor:pointer">'
-    +'<input type="checkbox" id="'+id+'-na"'+(isNA?' checked':'')+' onchange="(function(cb){var d=document.getElementById(\''+id+'\');if(cb.checked){d.value=\'\';d.disabled=true;}else{d.disabled=false;d.focus();}})(this)" style="cursor:pointer"> N/A'
+  return '<div style="display:flex;align-items:center;gap:6px">'
+    +'<input id="'+id+'" type="date" value="'+esc(isNA?'':val)+'"'+(isNA?' disabled':'')+' style="width:160px;background:#0d1f3c;border:1px solid #1a3652;border-radius:6px;padding:6px 8px;color:#dde5f0;font-size:13px;box-sizing:border-box">'
+    +'<label style="display:flex;align-items:center;gap:5px;color:#7a90b0;font-size:12px;cursor:pointer;white-space:nowrap">'
+    +'<input type="checkbox" id="'+id+'-na"'+(isNA?' checked':'')+' onchange="(function(cb){var d=document.getElementById(\''+id+'\');if(cb.checked){d.value=\'\';d.disabled=true;}else{d.disabled=false;d.focus();}})(this)" style="cursor:pointer;width:14px;height:14px"> N/A'
     +'</label></div>';
 }
 function normDate(v){
